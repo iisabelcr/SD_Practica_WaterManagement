@@ -63,6 +63,28 @@ public class DatabaseManager {
         }catch (SQLException e) {
             System.err.println("[BD Error] Error al crear la base de datos BD: " + e.getMessage());
         }
-
+    }
+    public static void leerEstacion(Estacion myestacion){
+        String sql="SELECT id,ubicacion,estado,caudalact,volumenacum FROM estaciones";
+        try( //1. Abre el canal de comunicación con el archivo SQLite.
+             Connection conn = connect();
+             //2. El objeto que transporta y ejecuta la orden SQL en la base de datos. Podria haber puesto PreparedStatement
+             //Pero como esta vez no estaba utilizando en el string sql lo de ? no hace falta
+             Statement stmt  = conn.createStatement();
+             // 3. El contenedor que recibe y guarda todas las filas devueltas por SQLite.Funcionaria como un cursor
+             ResultSet rs = stmt.executeQuery(sql) ){
+            while (rs.next()){
+                String id=rs.getString("id");
+                String ubicacion=rs.getString("ubicacion");
+                String estado=rs.getString("estado");
+                Double caudal=rs.getDouble("caudalact");
+                Double volumen=rs.getDouble("volumenacum");
+                //Recordatorio println no va con comas entonces utilizo printfn
+                //Es estupido que haya puesto en variables pero en fin
+                System.out.printf(id,ubicacion,estado,caudal,volumen);
+            }
+        }catch (SQLException e){
+            System.err.println("[BD Error] Error al leer la base de datos BD: " + e.getMessage());
+        }
     }
 }
