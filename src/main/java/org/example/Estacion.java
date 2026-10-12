@@ -1,19 +1,31 @@
 package org.example;
 
 public class Estacion {
-    String id;
-    String ubicacion;
-    String estado;
-    double caudalactual;
-    double volumenacum;
-    //Me faltaria pillar el id del operario
-    //Y no se si lo de detector como tal es un atributo o no y tambien lo de actuador
-    public Estacion(String id,String ubicacion,String estado,double caudalactual,double volumenacum){
+    private String id;
+    private String ubicacion;
+    //AVAILABLE,WATERING,LEAK,OUT_OF_SERVICE,OFFLINE estos son los estados
+    private String estado;
+    private double caudalactual;
+    private double volumenacum;
+    //La estación debe identificar al operario que realiza el riego y enviar su identificación a la Central para que esta pueda mostrarla y registrar la actividad.
+    private String operarioId;
+    //El constructor completo es para cuando leo los datos desde la base de datos SQLite
+    public Estacion(String id,String ubicacion,String estado,double caudalactual,double volumenacum,String operarioId){
         this.id=id;
         this.ubicacion=ubicacion;
         this.estado=estado;
         this.caudalactual=caudalactual;
         this.volumenacum=volumenacum;
+        this.operarioId=operarioId;
+    }
+    //Cuando se crea una estacion por primera vez(es decir la de alta)se utiliza el constructor simplificado
+    public Estacion(String id,String ubicacion){
+        this.id=id;
+        this.ubicacion=ubicacion;
+        this.estado="AVAILABLE";
+        this.caudalactual=0.0;
+        this.volumenacum=0.0;
+        this.operarioId=null;
     }
     public double getVolumenacum() {
         return volumenacum;
@@ -53,5 +65,12 @@ public class Estacion {
 
     public void setId(String id) {
         this.id = id;
+    }
+    public String getOperarioId() {
+        return operarioId;
+    }
+
+    public void setOperarioId(String operarioId) {
+        this.operarioId = operarioId;
     }
 }

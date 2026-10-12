@@ -5,6 +5,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DatabaseManager {
     //Busca en el disco si existe el archivo wm_central.db si no existe:SQLite lo crea automaticamente
@@ -46,9 +48,21 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error inicializando BD: " + e.getMessage());
         }
     }
-    public static void crearEstacion(Estacion myestacion){
+    public static void inserarOperarios(Operario myoperario){
+        String sql="INSERT INTO operarios (id,nombre) VALUES (?,?)";
+        try(Connection conn = connect();
+            PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1,myoperario.getId());
+            pstmt.setString(2,myoperario.getNombre());
+            pstmt.executeUpdate();
+        }
+        catch (SQLException e) {
+            System.err.println("[BD Error] Error al insertar en la base de datos BD: " + e.getMessage());
+        }
+    }
+    public static void insertarEstacion(Estacion myestacion){
         //Esto es para insertar dentro de los atributos de una estacion sus valores
-        String sql="INSERT INTO estaciones(id,ubicacion,estado,caudalact,volumenacum) VALUES (?,?,?,?,?)";
+        String sql="INSERT INTO estaciones (id,ubicacion,estado,caudalact,volumenacum,operarioId) VALUES (?,?,?,?,?,?)";
         //Intentamos ver si funciona la conexion
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -58,33 +72,152 @@ public class DatabaseManager {
             pstmt.setString(3,myestacion.getEstado());
             pstmt.setDouble(4,myestacion.getCaudalactual());
             pstmt.setDouble(5,myestacion.getVolumenacum());
+            pstmt.setString(6, myestacion.getOperarioId());
             //Esto es para ejecutar el update
             pstmt.executeUpdate();
         }catch (SQLException e) {
-            System.err.println("[BD Error] Error al crear la base de datos BD: " + e.getMessage());
+            System.err.println("[BD Error] Error al insertar en la base de datos BD: " + e.getMessage());
         }
     }
-    public static void leerEstacion(Estacion myestacion){
+    //Esta no se pa que muy bien la quiero
+    public static List<Operario> leerTodasOperario(){
+        List<Operario> lista = new ArrayList<>();
+        String sql="SELECT id,nombre FROM operarios";
+        try( //1. Abre el canal de comunicación con el archivo SQLite.
+             Connection conn = connect();
+             //2. El objeto que transporta y ejecuta la orden SQL en la base de datos. Podria haber puesto PreparedStatement
+             //Pero como esta vez no estaba utilizando en el string sql lo de ? no hace falta
+             Statement stmt  = conn.createStatement();
+             // 3. El contenedor que recibe y guarda todas las filas devueltas por SQLite. Funcionaria como un cursor
+             ResultSet rs = stmt.executeQuery(sql) ){
+            while (rs.next()){
+                String id=rs.getString("id");
+                String nombre=rs.getString("nombre");
+                System.out.printf("Operario -> ID: %s | Nombre: %s%n", id, nombre);
+                lista.add(new Operario(id,nombre));
+            }
+        }catch (SQLException e){
+            System.err.println("[BD Error] Error al leer la base de datos BD: " + e.getMessage());
+        }
+        return lista;
+    }
+    public static List<Estacion> leerTodasEstaciones(){
+        List<Estacion> lista = new ArrayList<>();
         String sql="SELECT id,ubicacion,estado,caudalact,volumenacum FROM estaciones";
         try( //1. Abre el canal de comunicación con el archivo SQLite.
              Connection conn = connect();
              //2. El objeto que transporta y ejecuta la orden SQL en la base de datos. Podria haber puesto PreparedStatement
              //Pero como esta vez no estaba utilizando en el string sql lo de ? no hace falta
              Statement stmt  = conn.createStatement();
-             // 3. El contenedor que recibe y guarda todas las filas devueltas por SQLite.Funcionaria como un cursor
+             // 3. El contenedor que recibe y guarda todas las filas devueltas por SQLite. Funcionaria como un cursor
              ResultSet rs = stmt.executeQuery(sql) ){
             while (rs.next()){
                 String id=rs.getString("id");
                 String ubicacion=rs.getString("ubicacion");
                 String estado=rs.getString("estado");
-                Double caudal=rs.getDouble("caudalact");
-                Double volumen=rs.getDouble("volumenacum");
+                double caudal=rs.getDouble("caudalact");
+                double volumen=rs.getDouble("volumenacum");
+                String operarioId = rs.getString("operarioId");
                 //Recordatorio println no va con comas entonces utilizo printfn
                 //Es estupido que haya puesto en variables pero en fin
-                System.out.printf(id,ubicacion,estado,caudal,volumen);
+                System.out.printf("Estación -> ID: %s | Ubicación: %s | Estado: %s | Caudal: %.2f | Vol: %.2f%n",
+                        id, ubicacion, estado, caudal, volumen);
+                lista.add(new Estacion(id, ubicacion, estado, caudal, volumen, operarioId));
             }
         }catch (SQLException e){
             System.err.println("[BD Error] Error al leer la base de datos BD: " + e.getMessage());
         }
+        return lista;
     }
+    public static void borrarOperario(Operario myoperario){
+        String sql="DELETE FROM operario where id=?";
+        try(
+            Connection conn = connect();
+            PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1,myoperario.getId());
+            pstmt.executeUpdate();
+        }catch (SQLException e){
+            System.err.println("[BD Error] Error al borrar: " + e.getMessage());
+        }
+    }
+    public static void borrarEstacion(Estacion myestacion){
+        String sql="DELETE FROM estaciones where id=?";
+        try(
+            Connection conn = connect();
+            PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, myestacion.getId());
+            pstmt.executeUpdate();
+        }catch (SQLException e){
+            System.err.println("[BD Error] Error al borrar: " + e.getMessage());
+        }
+    }
+    public static void actualizarOperario(Operario myoperario){
+        String sql ="UPDATE operario set nombre = ? where id = ?";
+        try(Connection conn = connect();
+        PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1,myoperario.getNombre());
+            pstmt.setString(2, myoperario.getId());
+            pstmt.executeUpdate();
+        }catch (SQLException e){
+            System.err.println("[BD Error] Error al actualizar la base de datos: " + e.getMessage());
+        }
+    }
+    public static void actualizarEstacion(Estacion myestacion){
+        String sql="UPDATE estaciones set ubicacion = ?, estado = ?,caudalact = ?,volumenacum = ?,operarioId = ? WHERE id = ?";
+        try(Connection conn= connect();
+            PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1,myestacion.getUbicacion());
+            pstmt.setString(2,myestacion.getEstado());
+            pstmt.setDouble(3,myestacion.getCaudalactual());
+            pstmt.setDouble(4,myestacion.getVolumenacum());
+            pstmt.setString(5, myestacion.getOperarioId());
+            pstmt.setString(6, myestacion.getId());
+            //Esto es para ejecutar el update
+            pstmt.executeUpdate();
+        }
+        catch (SQLException e){
+            System.err.println("[BD Error] Error al actualizar la base de datos: " + e.getMessage());
+        }
+    }
+    public static Operario obtenerEstacion(Operario myoperario){
+        String sql="SELECT id,nombre FROM operario where id = ?";
+        try (Connection conn = connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, myoperario.getId());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new Operario(
+                            rs.getString("id"),
+                            rs.getString("nombre")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[BD Error] Error al obtener el operario: " + e.getMessage());
+        }
+        return null;
+    }
+    public static Estacion obtenerEstacion(Estacion myestacion){
+        String sql="SELECT id,ubicacion,estado,caudalact,volumenacum,operarioId FROM estaciones where id = ?";
+        try (Connection conn = connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, myestacion.getId());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new Estacion(
+                            rs.getString("id"),
+                            rs.getString("ubicacion"),
+                            rs.getString("estado"),
+                            rs.getDouble("caudalact"),
+                            rs.getDouble("volumenacum"),
+                            rs.getString("operarioId")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[BD Error] Error al obtener la estación: " + e.getMessage());
+        }
+        return null;
+    }
+
 }
