@@ -1,4 +1,4 @@
-public class WM_WS_E {
+public class WM_E {
     public static void main(String[] args) {
         // Si los argumentos son incorrectos:
         if (args.length < 4) {
