@@ -1,8 +1,8 @@
 package org.example;
 
 public class Operario {
-    String id;
-    String nombre;
+    private String id;
+    private String nombre;
     public Operario(String id,String nombre){
         this.id=id;
         this.nombre=nombre;

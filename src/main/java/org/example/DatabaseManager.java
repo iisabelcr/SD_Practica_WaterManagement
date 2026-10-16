@@ -179,7 +179,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al actualizar la base de datos: " + e.getMessage());
         }
     }
-    public static Operario obtenerEstacion(Operario myoperario){
+    public static Operario obtenerOperario(Operario myoperario){
         String sql="SELECT id,nombre FROM operario where id = ?";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
