@@ -5,14 +5,84 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.Properties;
+import java.util.Scanner;
 
 public class WM_FO {
     /**
+     * Función que limpia la pantalla de la consola
+     */
+    private static void clear() {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+    }
+
+
+    /**
+     * Procedimiento que muestra mensajes de iniciación del programa.
+     * @param ipBroker
+     * @param puertoBroker
+     * @param idOperador
+     * @throws InterruptedException
+     */
+    private static void iniciarAplicacion(String ipBroker, String puertoBroker, String idOperador) throws InterruptedException {
+        System.out.println("Iniciando la aplicación...");
+        Thread.sleep(2000);
+        System.out.println("ID del operador: " + idOperador);
+        Thread.sleep(2000);
+        System.out.println("Conectando al Broker del gestor de colas en: " + ipBroker + ":" + puertoBroker);
+        Thread.sleep(2000);
+    }
+
+
+    /**
+     * Función que muestra y procesa el menú.
+     * @return opcion: número de la opción escogida en el menú
+     */
+    private static int mostrarMenu(Scanner scanner) {    
+        System.out.println("+-----------------------------+");
+        System.out.println("|       FIELD OPERATORS       |");
+        System.out.println("+-----------------------------+\n");
+
+        System.out.println("1. Procesar fichero de solicitudes de riego");
+        System.out.println("2. Solicitar suministro");
+        System.out.println("3. Ver estaciones de riego disponibles\n");
+
+        int opcion = -1;
+        boolean correcto = false; 
+
+        // Se seguirá pidiendo la opción hasta que se inserte un número correcto
+        while (!correcto) {
+            try {
+                System.out.println("Selecciona una opción: ");
+                opcion = Integer.parseInt(scanner.nextLine());
+
+                if (opcion >= 1 && opcion <= 3) {
+                    correcto = true;
+                } else {
+                   System.out.println("No existe esa opción"); 
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("La opción debe ser numérica");
+            }
+        }
+
+        return opcion;
+    }
+    
+
+    /**
      * Método que lee el fichero de los servicios a solicitar y se encarga del procesamiento y envío
      * de cada solicitud. Cada línea del archivo tendrá el código de la WS que se quiera activar.
-     */
-    private static void envioSolicitudes(String ipBroker, String puertoBroker, String idOperador, String servicios) {
+     * @param ipBroker
+     * @param puertoBroker
+     * @param idOperador
+     * @param servicios
+    */
+    private static void ficheroSolicitudes(String ipBroker, String puertoBroker, String idOperador, String servicios) {
         try (BufferedReader reader = new BufferedReader(new FileReader(servicios))) {
             String linea;
             String topic = "fo_central";
@@ -35,8 +105,8 @@ public class WM_FO {
             while ((linea = reader.readLine()) != null) {
                 System.out.println("Leyendo solicitud de servicio: " + linea);
 
-                // Se prepara la trama y la publicación en el topic (cola?):
-                String mensaje = idOperador + "#" + linea;
+                // Se prepara la trama y la publicación en la cola:
+                String mensaje = idOperador + "/" + linea;
                 ProducerRecord<String, String> registro = new ProducerRecord<>(topic, idOperador, mensaje);
 
                 // Se envía el mensaje de forma asíncrona, comprobando si ha fallado el envío o no:
@@ -66,8 +136,12 @@ public class WM_FO {
 
     /**
      * Función principal.
+     * @param args
      */
     public static void main(String[] args) {
+        // ---------------------------------------
+        // VALIDACIÓN DE ARGUMENTOS:
+        // ---------------------------------------
         // Si los argumentos son incorrectos:
         if (args.length < 3 || args.length > 4) {
             System.out.println("Debe indicar la IP y puerto del Broker del gestor de colas y el ID del operador");
@@ -85,13 +159,8 @@ public class WM_FO {
             String servicios = args[3];
         }
 
-        System.out.println("+-----------------------------+");
-        System.out.println("|       FIELD OPERATORS       |");
-        System.out.println("+-----------------------------+\n");
-
-        System.out.println("Iniciando la aplicación...");
-        System.out.println("ID del operador: " + idOperador);
-        System.out.println("Conectando al Broker del gestor de colas en: " + ipBroker + ":" + puertoBroker);
+        Scanner scanner = new Scanner(System.in); // Para la lectura de datos por consola
+        scanner.close(); // Se cierra el scanner
 
     }
 }
