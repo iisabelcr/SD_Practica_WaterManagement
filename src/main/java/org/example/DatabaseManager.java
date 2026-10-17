@@ -29,9 +29,10 @@ public class DatabaseManager {
                 estado TEXT NOT NULL DEFAULT 'DESCONECTADA',
                 caudalact REAL DEFAULT 0.0,
                 volumenacum REAL DEFAULT 0.0,
+                operarioId TEXT 
             );
             """;
-
+//No se si el operarioID tiene que ser not null o si lo puede ser
         String sqlOperarios = """
             CREATE TABLE IF NOT EXISTS operarios (
                 id TEXT PRIMARY KEY,

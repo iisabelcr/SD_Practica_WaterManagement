@@ -54,23 +54,48 @@ public class WM_Central {
         }
     }
     public static void main(String[] args){
-        //Se llama al initDatabase para crear la tabla de los operarios y de lasa estaciones
-        DatabaseManager.initDatabase();
-        //Luego se crea una instancia de la central
-        //Se leen todas las estaciones que hay en el databasemanager y se pone en el set
-        WM_Central central= new WM_Central();
-        central.setestaciones(DatabaseManager.leerTodasEstaciones());
-        //Se crea el socket
-        try(ServerSocket servidorsocket= new ServerSocket(8080)){
-            System.out.println("Se ha establecido un socket");
-            while(true){
-                servidorsocket.accept();
-                //ClientHandler cliente=new ClientHandler();
-
+        String puerto;
+        try{
+            //Yo no sé si el cliente tiene que poner el puerto de escucha, pero por ahora
+            //lo dejo asi con sus argumentos
+            if (args.length < 1) {
+                System.out.println("Debe indicar el puerto de escucha del servidor");
+                System.out.println("$./Servidor puerto_servidor");
+                System.exit (1);
             }
-        }catch(IOException e){
-            System.err.println("No se ha  podido establer un socket");
-        }
+            puerto = args[0];
+            //Se llama al initDatabase para crear la tabla de los operarios y de lasa estaciones
+            DatabaseManager.initDatabase();
+            //Luego se crea una instancia de la central
+            //Se leen todas las estaciones que hay en el databasemanager y se pone en el set
+            WM_Central central= new WM_Central();
+            central.setestaciones(DatabaseManager.leerTodasEstaciones());
+            //Se crea el socket
+            try(ServerSocket servidorsocket= new ServerSocket(Integer.parseInt(puerto))){
+                /*
+                 * Mantenemos la comunicacion con el cliente es un for infinito hasta que llega a ser -1
+                 */
+                for(;;)
+                {
+                    /*
+                     * Se espera un cliente que quiera conectarse
+                     */
+                    Socket skCliente = servidorsocket.accept(); // Crea objeto
+                    System.out.println("Sirviendo cliente...");
 
+                    ClientHandler handler=new ClientHandler(skCliente,central);
+                    //Aquí crea lo que viene a ser los diferentes hilos para cada cliente y dentro tiene el socket de cada cliente
+                    Thread t = new Thread(handler);
+                    //Y le da start
+                    t.start();
+                }
+            }catch(IOException e){
+                System.err.println("No se ha  podido establecer un socket");
+            }
+        }
+        catch(Exception e)
+        {
+            System.err.println("Error en el numero de argumentos");
+        }
     }
 }

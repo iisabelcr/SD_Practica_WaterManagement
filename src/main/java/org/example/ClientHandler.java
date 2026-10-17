@@ -1,11 +1,10 @@
 package org.example;
 
 import java.io.*;
-import java.net.ServerSocket;
 import java.net.Socket;
 
 public class ClientHandler implements Runnable{
-    private Socket servidorsocket;
+    private Socket socketCliente;
     private WM_Central central;
     private BufferedReader entrada;
     private PrintWriter salida;
@@ -17,7 +16,7 @@ public class ClientHandler implements Runnable{
     completo en segundo plano y no sabrás ni por qué falló.
     * */
     public ClientHandler(Socket s, WM_Central w){
-        servidorsocket=s;
+        socketCliente=s;
         central=w;
         try{
             InputStream aux = s.getInputStream();
@@ -26,7 +25,7 @@ public class ClientHandler implements Runnable{
             OutputStream aux2=  s.getOutputStream();
             this.salida= new PrintWriter(aux2,true);
         }catch(Exception e){
-            System.out.println("Error de lectura y/o de escritura  en el socket: " + e.toString());
+            System.out.println("Error de lectura y/o de escritura  en el socket: " + e);
         }
     }
     public String leerSocket(){
@@ -46,7 +45,7 @@ public class ClientHandler implements Runnable{
         }
     }
     public String processtrama(String trama){
-        String respuesta = "";
+        String respuesta;
         if(trama!=null){
             String[] parts =trama.split("#");
             if (parts.length>=3){
@@ -75,7 +74,26 @@ public class ClientHandler implements Runnable{
     @Override
     public void run() {
         String resultado;
-        String Cadena="";
-
+        String Cadena;
+        try{
+           while((Cadena=leerSocket())!=null){
+               System.out.println("Trama recibida" + Cadena);
+               resultado=this.processtrama(Cadena);
+               System.out.println("El resultado de la trama recibida"+resultado);
+               this.escribirSocket(resultado);
+           }
+        }catch(Exception e){
+            System.err.println("Error al realizar el run");
+        }
+        finally {
+            if( this. socketCliente!=null && !this. socketCliente.isClosed()){
+                try {
+                    this.socketCliente.close();
+                    System.out.println("Socket cerrado correctamente");
+                } catch (IOException e) {
+                    System.out.println("Socket no cerrado correctamente");
+                }
+            }
+        }
     }
 }
