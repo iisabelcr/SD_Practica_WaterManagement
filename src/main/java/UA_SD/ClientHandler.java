@@ -1,4 +1,4 @@
-package org.example;
+package UA_SD;
 
 import java.io.*;
 import java.net.Socket;

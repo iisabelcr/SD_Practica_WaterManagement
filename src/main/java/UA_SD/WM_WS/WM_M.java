@@ -1,4 +1,6 @@
-public class WM_WS_M {
+package UA_SD.WM_WS;
+
+public class WM_M {
     public static void main(String[] args) {
         // Si los argumentos son incorrectos:
         if (args.length < 4) {

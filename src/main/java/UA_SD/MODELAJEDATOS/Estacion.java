@@ -1,4 +1,4 @@
-package org.example;
+package UA_SD.MODELAJEDATOS;
 
 public class Estacion {
     private String id;
