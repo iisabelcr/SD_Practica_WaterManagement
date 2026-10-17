@@ -3,6 +3,8 @@ Prompts utilizados para la elaboración del proyecto:
 2. ¿Cómo funciona la lectura de un fichero de texto en Java?
 3. ¿Qué hace exactamente la función .flush() en el productor de Kafka en Java?
 4. ¿Cómo se hace una pausa de 4 segundos en Java?
+5. ¿Cómo se realiza la lectura de datos por consola en Java (como el scanf en C)?
+6. ¿Cómo limpiar la consola en un programa en Java?
 
 Otras fuentes de información:
 - https://www.conduktor.io/kafka/complete-kafka-producer-with-java
