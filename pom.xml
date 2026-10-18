@@ -19,5 +19,10 @@
         <artifactId>sqlite-jdbc</artifactId>
         <version>3.45.1.0</version>
     </dependency>
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>3.6.1</version>
+        </dependency>
     </dependencies>
 </project>

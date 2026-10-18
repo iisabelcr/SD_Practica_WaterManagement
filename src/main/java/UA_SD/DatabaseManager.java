@@ -1,4 +1,7 @@
 package UA_SD;
+import UA_SD.MODELAJEDATOS.Estacion;
+import UA_SD.MODELAJEDATOS.Operario;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -26,7 +29,7 @@ public class DatabaseManager {
             CREATE TABLE IF NOT EXISTS estaciones(
                 id TEXT PRIMARY KEY,
                 ubicacion TEXT NOT NULL,
-                estado TEXT NOT NULL DEFAULT 'DESCONECTADA',
+                estado TEXT NOT NULL DEFAULT 'AVAILABLE',
                 caudalact REAL DEFAULT 0.0,
                 volumenacum REAL DEFAULT 0.0,
                 operarioId TEXT 
@@ -49,7 +52,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error inicializando BD: " + e.getMessage());
         }
     }
-    public static void inserarOperarios(Operario myoperario){
+    public static void insertarOperarios(Operario myoperario){
         String sql="INSERT INTO operarios (id,nombre) VALUES (?,?)";
         try(Connection conn = connect();
             PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -153,7 +156,7 @@ public class DatabaseManager {
         }
     }
     public static void actualizarOperario(Operario myoperario){
-        String sql ="UPDATE operario set nombre = ? where id = ?";
+        String sql ="UPDATE operarios set nombre = ? where id = ?";
         try(Connection conn = connect();
         PreparedStatement pstmt = conn.prepareStatement(sql)){
             pstmt.setString(1,myoperario.getNombre());
@@ -180,11 +183,11 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al actualizar la base de datos: " + e.getMessage());
         }
     }
-    public static Operario obtenerOperario(Operario myoperario){
-        String sql="SELECT id,nombre FROM operario where id = ?";
+    public static Operario obtenerOperario(String id){
+        String sql="SELECT id,nombre FROM operarios where id = ?";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, myoperario.getId());
+            pstmt.setString(1, id);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     return new Operario(
@@ -198,11 +201,11 @@ public class DatabaseManager {
         }
         return null;
     }
-    public static Estacion obtenerEstacion(Estacion myestacion){
+    public static Estacion obtenerEstacion(String id){
         String sql="SELECT id,ubicacion,estado,caudalact,volumenacum,operarioId FROM estaciones where id = ?";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, myestacion.getId());
+            pstmt.setString(1,id);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     return new Estacion(

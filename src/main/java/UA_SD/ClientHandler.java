@@ -1,5 +1,7 @@
 package UA_SD;
 
+import UA_SD.MODELAJEDATOS.Estacion;
+
 import java.io.*;
 import java.net.Socket;
 
@@ -49,14 +51,27 @@ public class ClientHandler implements Runnable{
         if(trama!=null){
             String[] parts =trama.split("#");
             if (parts.length>=3){
-                if(parts[0].compareToIgnoreCase("REGISTRO_ESTACION")==0){
-                    Estacion nueva =new Estacion(parts[1],parts[2]);
-                    this.central.anadirestacion(nueva);
-                    respuesta="OK#ESTACION_REGISTRADA";
+                if(parts[0].equalsIgnoreCase("REGISTRO")){
+                    Estacion estacionmdb=DatabaseManager.obtenerEstacion(parts[1]);
+                    //Se comprueba si estaba antes en la base de datos
+                    if(estacionmdb==null){
+                        Estacion nueva =new Estacion(parts[1],parts[2]);
+                        this.central.anadirestacion(nueva);
+                        respuesta="OK#ESTACION_REGISTRADA";
+                    }
+                    else{
+                        this.central.actualEstadoEstacion(parts[1],parts[2]);
+                        respuesta="OK#ESTADO_ACTUALIZADO";
+                    }
                 }
-                else if(parts[0].compareToIgnoreCase("ACTUALIZAR_ESTADO")==0){
-                    this.central.actualEstadoEstacion(parts[1],parts[2]);
-                    respuesta="OK#ESTADO_ACTUALIZADO";
+                else if(parts[0].equalsIgnoreCase("ACTUALIZAR_ESTADO")){
+                    boolean aux=this.central.actualEstadoEstacion(parts[1],parts[2]);
+                    if(aux){
+                        respuesta="OK#ESTADO_ACTUALIZADO";
+                    }
+                    else{
+                        respuesta = "STATUS#ERROR#Estacion no encontrada";
+                    }
                 }
                 else{
                     respuesta = "STATUS#ERROR#Operacion no valida";
