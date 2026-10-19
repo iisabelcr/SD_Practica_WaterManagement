@@ -10,6 +10,7 @@ public class ClientHandler implements Runnable{
     private WM_Central central;
     private BufferedReader entrada;
     private PrintWriter salida;
+    private String idEstacion;
     /*
     Los canales de texto sirven como "tuberías" para que tu programa mande y reciba palabras a través
     del cable de internet. Tienes que prepararlos dentro del constructor (en el momento de nacer el objeto)
@@ -50,39 +51,94 @@ public class ClientHandler implements Runnable{
         String respuesta;
         if(trama!=null){
             String[] parts =trama.split("#");
-            if (parts.length>=3){
-                if(parts[0].equalsIgnoreCase("REGISTRO")){
+            if (parts.length>=1){
+                if(parts[0].equalsIgnoreCase("REGISTRO") && parts.length>=3){
                     Estacion estacionmdb=DatabaseManager.obtenerEstacion(parts[1]);
                     //Se comprueba si estaba antes en la base de datos
                     if(estacionmdb==null){
                         Estacion nueva =new Estacion(parts[1],parts[2]);
                         this.central.anadirestacion(nueva);
-                        respuesta="OK#ESTACION_REGISTRADA";
+                        respuesta="OK/ESTACION_REGISTRADA";
+                        this.idEstacion=parts[1];
+                        this.central.agregarmap(parts[1],this);
                     }
                     else{
                         this.central.actualEstadoEstacion(parts[1],parts[2]);
-                        respuesta="OK#ESTADO_ACTUALIZADO";
+                        respuesta="OK/ESTADO_ACTUALIZADO";
                     }
                 }
-                else if(parts[0].equalsIgnoreCase("ACTUALIZAR_ESTADO")){
+                else if(parts[0].equalsIgnoreCase("ACTUALIZAR_ESTADO") && parts.length>=3){
                     boolean aux=this.central.actualEstadoEstacion(parts[1],parts[2]);
                     if(aux){
-                        respuesta="OK#ESTADO_ACTUALIZADO";
+                        respuesta="OK/ESTADO_ACTUALIZADO";
                     }
                     else{
-                        respuesta = "STATUS#ERROR#Estacion no encontrada";
+                        respuesta = "STATUS/ERROR7Estacion no encontrada";
                     }
                 }
+                else if (parts[0].equalsIgnoreCase("RESPUESTA_RIEGO") && parts.length>=3) {
+                    this.idEstacion = parts[1];
+                    String estado = parts[2]; // Viene "OK" o "NOK"
+                    if (estado.equalsIgnoreCase("OK")) {
+                        System.out.println("Riego iniciado con éxito en la estación " + this.idEstacion);
+                        this.central.actualEstadoEstacion(this.idEstacion, "REGANDO");
+                        String mensajeKafka = "RESPUESTA_RIEGO/"  + this.idEstacion + "/OK";
+                        this.central.enviarmensajekafka("central_fo",mensajeKafka);
+                        respuesta=null;
+                    }
+                    else{
+                        String mensajeKafka = "RESPUESTA_RIEGO/"  + this.idEstacion + "/NOK";
+                        this.central.enviarmensajekafka("central_fo",mensajeKafka);
+                        respuesta=null;
+                    }
+                }
+                else if(parts[0].equalsIgnoreCase("DATOS_RIEGO") && parts.length>=4){
+                    this.idEstacion=parts[1];
+                    double caudal=Double.parseDouble(parts[2].replace(',', '.'));
+                    double volumen=Double.parseDouble(parts[3].replace(',', '.'));
+                    System.out.println(this.idEstacion+ caudal +volumen);
+                    String mensajeKafka = "DATOS_RIEGO/" + this.idEstacion + "/" + caudal + "/" + volumen;
+                    this.central.enviarmensajekafka("central_fo",mensajeKafka);
+                    respuesta=null;
+                }
+                else if(parts[0].equalsIgnoreCase("FIN_RIEGO") && parts.length>=4){
+                    this.idEstacion=parts[1];
+                    this.central.actualEstadoEstacion(this.idEstacion, "AVAILABLE");
+                    double tiempo=Double.parseDouble(parts[2].replace(',', '.'));
+                    double volumen=Double.parseDouble(parts[3].replace(',', '.'));
+                    System.out.println(this.idEstacion+ tiempo +volumen);
+                    String mensajeKafka = "FIN_RIEGO/" + this.idEstacion + "/" + tiempo + "/" + volumen;
+                    this.central.enviarmensajekafka("central_fo",mensajeKafka);
+                    respuesta=null;
+                }
+                else if(parts[0].equalsIgnoreCase("FUGA") && parts.length>=2){
+                    this.idEstacion = parts[1];
+                    String estado = parts[2];
+                    System.out.println("No hay riego porque hay una avería en la estación " + this.idEstacion);
+                    this.central.actualEstadoEstacion(this.idEstacion,"LEAK");
+                    String mensajeKafka = "ALERTA_FUGA/" + this.idEstacion;
+                    this.central.enviarmensajekafka("central_fo",mensajeKafka);
+                    respuesta=null;
+                }
+                else if(parts[0].equalsIgnoreCase("FUGA_RESUELTA") && parts.length>=2){
+                    this.idEstacion = parts[1];
+                    String estado = parts[2];
+                    System.out.println("Ya no hay una avería en la estación " + this.idEstacion);
+                    this.central.actualEstadoEstacion(this.idEstacion,"AVAILABLE");
+                    String mensajeKafka = "FUGA_RESUELTA/" + this.idEstacion;
+                    this.central.enviarmensajekafka("central_fo",mensajeKafka);
+                    respuesta=null;
+                }
                 else{
-                    respuesta = "STATUS#ERROR#Operacion no valida";
+                    respuesta = "STATUS/ERROR/Operacion no valida";
                 }
             }
             else {
-                respuesta = "STATUS#ERROR#Operacion no valida";
+                respuesta = "STATUS/ERROR/Operacion no valida";
             }
         }
         else{
-            respuesta = "STATUS#ERROR#Operacion no valida";
+            respuesta = "STATUS/ERROR/Operacion no valida";
         }
         return respuesta;
     }
@@ -105,10 +161,21 @@ public class ClientHandler implements Runnable{
                 try {
                     this.socketCliente.close();
                     System.out.println("Socket cerrado correctamente");
+                    this.central.eliminarmap(this.idEstacion);
+                    this.central.actualEstadoEstacion(this.idEstacion, "DISCONNECTED");
                 } catch (IOException e) {
                     System.out.println("Socket no cerrado correctamente");
                 }
             }
+        }
+    }
+    public void enviarTrama(String s) {
+        if(salida !=null && this.socketCliente != null && !this.socketCliente.isClosed()){
+            System.out.println(s);
+            System.out.flush();
+        }
+        else{
+            System.err.println("o se pudo enviar la trama, socket no disponible");
         }
     }
 }
