@@ -29,20 +29,25 @@ public class WM_FO {
     }
 
 
+
     /**
      * Procedimiento que muestra mensajes de iniciación del programa.
      * @param ipBroker
      * @param puertoBroker
      * @param idOperador
-     * @throws InterruptedException
      */
-    private static void iniciarAplicacion(String ipBroker, String puertoBroker, String idOperador) throws InterruptedException {
-        System.out.println("Iniciando la aplicación...");
-        Thread.sleep(2000);
-        System.out.println("ID del operador: " + idOperador);
-        Thread.sleep(2000);
-        System.out.println("Conectando al Broker del gestor de colas en: " + ipBroker + ":" + puertoBroker);
-        Thread.sleep(2000);
+    private static void iniciarAplicacion(String ipBroker, String puertoBroker, String idOperador) {
+        try {
+            System.out.println("Iniciando la aplicación...");
+            Thread.sleep(2000);
+            System.out.println("ID del operador: " + idOperador);
+            Thread.sleep(2000);
+            System.out.println("Conectando al Broker del gestor de colas en: " + ipBroker + ":" + puertoBroker);
+            Thread.sleep(2000);
+        } catch (InterruptedException e)  {
+            System.err.println("Fallo al iniciar la aplicación");
+        }
+        
     }
 
 
