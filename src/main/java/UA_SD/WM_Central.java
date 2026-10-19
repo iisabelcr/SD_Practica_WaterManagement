@@ -13,8 +13,6 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
@@ -92,6 +90,11 @@ public class WM_Central {
             }
             //Y se pone en el set
             central.setestaciones(guardadasestaciones);
+            //Arrancar el Consumidor de Kafka (Crea un hilo en segundo plano y continúa)
+            //Por algun motivo no puedo añadir el mismo puerto
+            /*Tenia puesto "5000"0=> que el consumidor de Kafka intentara conectarse
+            al puerto del Socket de Java de la propia Central en lugar de al servidor de Kafka de Docker*/
+            central.incioconsumidorkafka("localhost","9092","fo_central");
             //Se crea el socket
             try(ServerSocket servidorsocket= new ServerSocket(Integer.parseInt(puerto))){
                 /*
@@ -136,8 +139,8 @@ public class WM_Central {
                 props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
                 //No se si deberia ponerle un grupo
                 props.put(ConsumerConfig.GROUP_ID_CONFIG, "grupo-consumidores");
-                props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-                props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+                props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+                props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
 
                 // Se crea el consumidor:
                 KafkaConsumer<String, String> consumer = new KafkaConsumer(props);
