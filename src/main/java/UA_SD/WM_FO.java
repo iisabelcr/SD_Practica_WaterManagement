@@ -146,8 +146,6 @@ public class WM_FO {
     /**
      * Método que lee el fichero de los servicios a solicitar y se encarga del procesamiento y envío
      * de cada solicitud. Cada línea del archivo tendrá el código de la WS que se quiera activar.
-     * @param ipBroker
-     * @param puertoBroker
      * @param idOperador
      * @param servicios
      */

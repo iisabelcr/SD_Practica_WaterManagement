@@ -15,9 +15,6 @@ public class WM_M {
 
     /**
      * Procedimiento que muestra mensajes de iniciación del programa.
-     * @param ipBroker
-     * @param puertoBroker
-     * @param idOperador
      */
     private static void iniciarMonitor() {
         try {
@@ -35,7 +32,6 @@ public class WM_M {
     /**
      * Función que lee la información procedente del socket.
      * @param socket
-     * @param datos
      * @return datos
      */
     private static String leerSocket (Socket socket) {
