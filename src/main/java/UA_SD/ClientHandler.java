@@ -50,7 +50,7 @@ public class ClientHandler implements Runnable{
     public String processtrama(String trama){
         String respuesta;
         if(trama!=null){
-            String[] parts =trama.split("#");
+            String[] parts =trama.split("/");
             if (parts.length>=1){
                 if(parts[0].equalsIgnoreCase("REGISTRO") && parts.length>=3){
                     Estacion estacionmdb=DatabaseManager.obtenerEstacion(parts[1]);
