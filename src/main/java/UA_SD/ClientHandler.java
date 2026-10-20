@@ -76,59 +76,6 @@ public class ClientHandler implements Runnable{
                         respuesta = " STATUS/ERROR/Estacion no encontrada";
                     }
                 }
-                else if (parts[0].equalsIgnoreCase("RESPUESTA_RIEGO") && parts.length>=3) {
-                    this.idEstacion = parts[1];
-                    String estado = parts[2]; // Viene "OK" o "NOK"
-                    if (estado.equalsIgnoreCase("OK")) {
-                        System.out.println("Riego iniciado con éxito en la estación " + this.idEstacion);
-                        this.central.actualEstadoEstacion(this.idEstacion, "REGANDO");
-                        String mensajeKafka = " RESPUESTA_RIEGO/"  + this.idEstacion + "/OK";
-                        this.central.enviarmensajekafka("central_fo",mensajeKafka);
-                        respuesta=null;
-                    }
-                    else{
-                        String mensajeKafka = " RESPUESTA_RIEGO/"  + this.idEstacion + "/NOK";
-                        this.central.enviarmensajekafka("central_fo",mensajeKafka);
-                        respuesta=null;
-                    }
-                }
-                else if(parts[0].equalsIgnoreCase("DATOS_RIEGO") && parts.length>=4){
-                    this.idEstacion=parts[1];
-                    double caudal=Double.parseDouble(parts[2].replace(',', '.'));
-                    double volumen=Double.parseDouble(parts[3].replace(',', '.'));
-                    System.out.println(this.idEstacion+ caudal +volumen);
-                    String mensajeKafka = " DATOS_RIEGO/" + this.idEstacion + "/" + caudal + "/" + volumen;
-                    this.central.enviarmensajekafka("central_fo",mensajeKafka);
-                    respuesta=null;
-                }
-                else if(parts[0].equalsIgnoreCase("FIN_RIEGO") && parts.length>=4){
-                    this.idEstacion=parts[1];
-                    this.central.actualEstadoEstacion(this.idEstacion, "AVAILABLE");
-                    double tiempo=Double.parseDouble(parts[2].replace(',', '.'));
-                    double volumen=Double.parseDouble(parts[3].replace(',', '.'));
-                    System.out.println(this.idEstacion+ tiempo +volumen);
-                    String mensajeKafka = " FIN_RIEGO/" + this.idEstacion + "/" + tiempo + "/" + volumen;
-                    this.central.enviarmensajekafka("central_fo",mensajeKafka);
-                    respuesta=null;
-                }
-                else if(parts[0].equalsIgnoreCase("FUGA") && parts.length>=2){
-                    this.idEstacion = parts[1];
-                    String estado = parts[2];
-                    System.out.println("No hay riego porque hay una avería en la estación " + this.idEstacion);
-                    this.central.actualEstadoEstacion(this.idEstacion,"LEAK");
-                    String mensajeKafka = " ALERTA_FUGA/" + this.idEstacion;
-                    this.central.enviarmensajekafka("central_fo",mensajeKafka);
-                    respuesta=null;
-                }
-                else if(parts[0].equalsIgnoreCase("FUGA_RESUELTA") && parts.length>=2){
-                    this.idEstacion = parts[1];
-                    String estado = parts[2];
-                    System.out.println("Ya no hay una avería en la estación " + this.idEstacion);
-                    this.central.actualEstadoEstacion(this.idEstacion,"AVAILABLE");
-                    String mensajeKafka = " FUGA_RESUELTA/" + this.idEstacion;
-                    this.central.enviarmensajekafka("central_fo",mensajeKafka);
-                    respuesta=null;
-                }
                 else{
                     respuesta = " STATUS/ERROR/Operacion no valida";
                 }
@@ -169,13 +116,13 @@ public class ClientHandler implements Runnable{
             }
         }
     }
-    public void enviarTrama(String s) {
+    //Para enviar una trama necesito el productor el mensaje que ya esta aqui y el topico
+    public void enviarTrama(String s,String topic) {
         if(salida !=null && this.socketCliente != null && !this.socketCliente.isClosed()){
-            System.out.println(s);
-            System.out.flush();
+          central.enviarmensajekafka(s,topic);
         }
         else{
-            System.err.println("o se pudo enviar la trama, socket no disponible");
+            System.err.println("No se pudo enviar la trama, socket no disponible");
         }
     }
 }

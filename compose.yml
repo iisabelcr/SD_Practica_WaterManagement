@@ -2,6 +2,12 @@ services:
   broker:
     image: apache/kafka:latest
     hostname: broker
+    healthcheck:
+      test: [ "CMD-SHELL", "nc -z localhost 9092 || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     container_name: broker
     ports:
       - 9092:9092
@@ -26,3 +32,16 @@ services:
     image: mongo:latest
     ports:
       - 27017:27017
+  kafka-init:
+    image: apache/kafka:3.7.0
+    depends_on:
+      broker:
+        condition: service_healthy
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker:9092 --create --if-not-exists --topic fo_central --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker:9092 --create --if-not-exists --topic central_fo --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker:9092 --create --if-not-exists --topic central_engine --replication-factor 1
+      echo 'Topics creados exitosamente'
+      "
