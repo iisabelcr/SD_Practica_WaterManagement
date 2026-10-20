@@ -210,9 +210,10 @@ public class WM_M {
         // Creamos el hilo servidor entre el Monitor y el Engine y lo activamos:
         HiloServidorEngine servidor = new HiloServidorEngine(Integer.parseInt(puertoServidor), ipCentral, Integer.parseInt(puertoCentral), idWS);
         servidor.start();
-
     }
 }
 
 
 // COSAS QUE HACER:
+// Leer la respuesta de registro por parte de central
+// Quiero hacer que los mensajes de los sockets se preparen en funciones, para poder cambiarlos más fácilmente
