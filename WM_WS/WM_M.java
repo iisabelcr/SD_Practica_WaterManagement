@@ -7,12 +7,14 @@ public class WM_M {
      */
     static class HiloServidorEngine extends Thread {
         private int puertoServidor;
-        private Socket socketCentral;
+        private String ipCentral;
+        private int puertoCentral;
         private String idWS;
 
-        public HiloServidorEngine(int puerto, Socket socketCentral, String idWS) {
+        public HiloServidorEngine(int puerto, String ipCentral, int puertoCentral, String idWS) {
             this.puertoServidor = puerto;
-            this.socketCentral = socketCentral;
+            this.ipCentral = ipCentral;
+            this.puertoCentral = puertoCentral;
             this.idWS = idWS;
         }
 
@@ -21,40 +23,73 @@ public class WM_M {
                     ServerSocket servidor = new ServerSocket(puertoServidor);
                     System.out.println("Monitor a la escucha del Engine en el puerto local " + puertoServidor + "...");
 
-                    Socket socketEngine = servidor.accept(); // El Monitor espera indefinidamente hasta que se conecte el Engine
-                    System.out.println("Conexión establecida con el Engine");
-
-                    comprobarSalud(socketEngine); // Iniciamos la comprobación periódica del estado de salud
+                    while (true) {
+                        Socket socketEngine = servidor.accept(); // El Monitor espera indefinidamente hasta que se conecte el Engine
+                        System.out.println("Conexión establecida con el Engine");
+                        
+                        comprobarSalud(socketEngine); // Iniciamos la comprobación periódica del estado de salud
+                    }
             
             } catch (Exception e) {
-                System.out.println("Ha fallado la conexión con el Engine");
+                System.out.println("Fallo crítico en el Servidor del Monitor");
                 System.out.println("Error: " + e.getMessage());
             }
         }
 
         private void comprobarSalud(Socket socketEngine) {
+            boolean averia = false; // Determina si la estación se encuentra en avería para no enviar varias veces el mismo mensaje a Central
+            
             try {
                 // Manda información al Engine infinitamente:
                 while (true) {
                     escribirSocket(socketEngine, "STATUS"); // Manda un mensaje de comprobación de estado de salud
-
                     String respuesta = leerSocket(socketEngine);
+                    
+                    // Si el engine no responde, se notifica la avería a Central:
+                    if (respuesta == null) {
+                        if (!averia) {
+                            notificarCentral("AVERIA/" + idWS);
+                            System.out.println("El Engine se ha desconectado. Reconectando...");
+                            break;
+                        }
+                    }
 
-                    if (respuesta.equals("KO")) {
-                        String mensaje = "AVERIA/" + idWS;
-                        escribirSocket(socketCentral, mensaje);
+                    // Si se ha producido una avería real, notificamos también:
+                    else if (respuesta.equals("KO")) {
+                        if (!averia) {
+                            notificarCentral("AVERIA/" + idWS);
+                            System.out.println("Se ha producido una avería en la Estación de riego. Esperando recuperación...");
+                            averia = true;
+                        }
+                    }
 
-                        while (leerSocket(socketEngine) == "KO") {
-                            wait();
+                    // Si todo va bien, no se hace nada. En caso de que se haya recuperado de una avería, hay que notificar a Central:
+                    else if (respuesta.equals("OK")) {
+                        if (averia) {
+                            notificarCentral("RECUPERACIÓN/" + idWS);
+                            System.out.println("Se ha solucionado la avería");
+                            averia = false;
                         }
                     }
 
                     Thread.sleep(1000); // Provoca el envío cada segundo
                 }
+
             } catch (Exception e) {
-                System.out.println("Se ha perdido la conexión con el Engine");
+                System.out.println("Se ha perdido la conexión con el Engine. Reconectando...");
                 System.out.println("Error: " + e.getMessage());
 
+            }
+        }
+
+        private void notificarCentral(String mensaje) {
+            try {
+                Socket socketCentral = new Socket(ipCentral, puertoCentral);
+                escribirSocket(socketCentral, mensaje);
+
+            } catch (Exception e) {
+                System.out.println("Fallo al intentar notificar el estado a Central");
+                System.out.println("Error: " + e.getMessage());
             }
         }
     }
@@ -173,7 +208,7 @@ public class WM_M {
         // CONEXIÓN CON EL ENGINE:
         // ------------------------
         // Creamos el hilo servidor entre el Monitor y el Engine y lo activamos:
-        HiloServidorEngine servidor = new HiloServidorEngine(Integer.parseInt(puertoServidor), socketCentral, idWS);
+        HiloServidorEngine servidor = new HiloServidorEngine(Integer.parseInt(puertoServidor), ipCentral, Integer.parseInt(puertoCentral), idWS);
         servidor.start();
 
     }
@@ -181,4 +216,3 @@ public class WM_M {
 
 
 // COSAS QUE HACER:
-//1. Gestionar la lógica de las averías dentro del hilo servidor
