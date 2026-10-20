@@ -58,22 +58,22 @@ public class ClientHandler implements Runnable{
                     if(estacionmdb==null){
                         Estacion nueva =new Estacion(parts[1],parts[2]);
                         this.central.anadirestacion(nueva);
-                        respuesta="OK/ESTACION_REGISTRADA";
+                        respuesta=" OK/ESTACION_REGISTRADA";
                         this.idEstacion=parts[1];
                         this.central.agregarmap(parts[1],this);
                     }
                     else{
                         this.central.actualEstadoEstacion(parts[1],parts[2]);
-                        respuesta="OK/ESTADO_ACTUALIZADO";
+                        respuesta=" OK/ESTADO_ACTUALIZADO";
                     }
                 }
                 else if(parts[0].equalsIgnoreCase("ACTUALIZAR_ESTADO") && parts.length>=3){
                     boolean aux=this.central.actualEstadoEstacion(parts[1],parts[2]);
                     if(aux){
-                        respuesta="OK/ESTADO_ACTUALIZADO";
+                        respuesta=" OK/ESTADO_ACTUALIZADO";
                     }
                     else{
-                        respuesta = "STATUS/ERROR7Estacion no encontrada";
+                        respuesta = " STATUS/ERROR/Estacion no encontrada";
                     }
                 }
                 else if (parts[0].equalsIgnoreCase("RESPUESTA_RIEGO") && parts.length>=3) {
@@ -82,12 +82,12 @@ public class ClientHandler implements Runnable{
                     if (estado.equalsIgnoreCase("OK")) {
                         System.out.println("Riego iniciado con éxito en la estación " + this.idEstacion);
                         this.central.actualEstadoEstacion(this.idEstacion, "REGANDO");
-                        String mensajeKafka = "RESPUESTA_RIEGO/"  + this.idEstacion + "/OK";
+                        String mensajeKafka = " RESPUESTA_RIEGO/"  + this.idEstacion + "/OK";
                         this.central.enviarmensajekafka("central_fo",mensajeKafka);
                         respuesta=null;
                     }
                     else{
-                        String mensajeKafka = "RESPUESTA_RIEGO/"  + this.idEstacion + "/NOK";
+                        String mensajeKafka = " RESPUESTA_RIEGO/"  + this.idEstacion + "/NOK";
                         this.central.enviarmensajekafka("central_fo",mensajeKafka);
                         respuesta=null;
                     }
@@ -97,7 +97,7 @@ public class ClientHandler implements Runnable{
                     double caudal=Double.parseDouble(parts[2].replace(',', '.'));
                     double volumen=Double.parseDouble(parts[3].replace(',', '.'));
                     System.out.println(this.idEstacion+ caudal +volumen);
-                    String mensajeKafka = "DATOS_RIEGO/" + this.idEstacion + "/" + caudal + "/" + volumen;
+                    String mensajeKafka = " DATOS_RIEGO/" + this.idEstacion + "/" + caudal + "/" + volumen;
                     this.central.enviarmensajekafka("central_fo",mensajeKafka);
                     respuesta=null;
                 }
@@ -107,7 +107,7 @@ public class ClientHandler implements Runnable{
                     double tiempo=Double.parseDouble(parts[2].replace(',', '.'));
                     double volumen=Double.parseDouble(parts[3].replace(',', '.'));
                     System.out.println(this.idEstacion+ tiempo +volumen);
-                    String mensajeKafka = "FIN_RIEGO/" + this.idEstacion + "/" + tiempo + "/" + volumen;
+                    String mensajeKafka = " FIN_RIEGO/" + this.idEstacion + "/" + tiempo + "/" + volumen;
                     this.central.enviarmensajekafka("central_fo",mensajeKafka);
                     respuesta=null;
                 }
@@ -116,7 +116,7 @@ public class ClientHandler implements Runnable{
                     String estado = parts[2];
                     System.out.println("No hay riego porque hay una avería en la estación " + this.idEstacion);
                     this.central.actualEstadoEstacion(this.idEstacion,"LEAK");
-                    String mensajeKafka = "ALERTA_FUGA/" + this.idEstacion;
+                    String mensajeKafka = " ALERTA_FUGA/" + this.idEstacion;
                     this.central.enviarmensajekafka("central_fo",mensajeKafka);
                     respuesta=null;
                 }
@@ -125,20 +125,20 @@ public class ClientHandler implements Runnable{
                     String estado = parts[2];
                     System.out.println("Ya no hay una avería en la estación " + this.idEstacion);
                     this.central.actualEstadoEstacion(this.idEstacion,"AVAILABLE");
-                    String mensajeKafka = "FUGA_RESUELTA/" + this.idEstacion;
+                    String mensajeKafka = " FUGA_RESUELTA/" + this.idEstacion;
                     this.central.enviarmensajekafka("central_fo",mensajeKafka);
                     respuesta=null;
                 }
                 else{
-                    respuesta = "STATUS/ERROR/Operacion no valida";
+                    respuesta = " STATUS/ERROR/Operacion no valida";
                 }
             }
             else {
-                respuesta = "STATUS/ERROR/Operacion no valida";
+                respuesta = " STATUS/ERROR/Operacion no valida";
             }
         }
         else{
-            respuesta = "STATUS/ERROR/Operacion no valida";
+            respuesta = " STATUS/ERROR/Operacion no valida";
         }
         return respuesta;
     }
