@@ -1,8 +1,27 @@
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+
 import java.io.*;
 import java.net.*;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.Properties;
 import java.util.Scanner;
 
 public class WM_E {
+    /**
+     * Topic de la comuncicación a través de Kafka desde el Engine a Central.
+     */
+    private static final String TOPIC_PRODUCTOR = "engine_central";
+
+    /**
+     * Topic de la comuncicación a través de Kafka desde Central al Engine.
+     */
+    private static final String TOPIC_CONSUMIDOR = "central_engine";
+
     /**
      * Atributo de la clase que determina si la WS está averiada
      */
@@ -15,6 +34,7 @@ public class WM_E {
      * HiloKO
      */
     static class HiloKO extends Thread {
+        @Override
         public void run() {
             Scanner scanner = new Scanner(System.in);
 
@@ -27,6 +47,49 @@ public class WM_E {
                 scanner.nextLine(); // El hilo se queda parado hasta que se pulse una tecla
                 averia = false;
             }
+        }
+    }
+
+
+
+    /**
+     * Clase interna que permite separar la comunicación desde Central al Engine en un hilo aparte.
+     * HiloConsumidorKafka
+     */
+    static class HiloConsumidorKafka extends Thread {
+        private String ipBroker;
+        private String puertoBroker;
+
+        public HiloConsumidorKafka(String ipBroker, String puertoBroker) {
+            this.ipBroker = ipBroker;
+            this.puertoBroker = puertoBroker;
+        }
+
+        @Override
+        public void run() {
+            // Creamos el consumidor:
+            KafkaConsumer<String, String> consumidor = crearConsumidor(ipBroker, puertoBroker);
+            
+            while (true) {
+                // Recibimos el mensaje por parte de Central (o varios mensajes):
+                ConsumerRecords<String, String> registros = consumidor.poll(Duration.ofSeconds(1));
+
+                // Procesamos cada mensaje:
+                for (ConsumerRecord<String, String> registro : registros) {
+                    String mensaje = registro.value();
+                    System.out.println("Orden recibida desde Central: " + mensaje);
+
+                    String[] info = mensaje.split("/");
+                    String operacion = info[0]; // Extraemos el código de la operación
+
+                    if (operacion.equals("SOLICITUD_RIEGO")) {
+                        // AQUI INICIO EL RIEGO Y TAL
+                    }
+                    
+                }
+            }
+
+            //consumidor.close(); // Se cierra el topic
         }
     }
 
@@ -99,6 +162,35 @@ public class WM_E {
 
 
     /**
+     * Función que crea el consumidor las comunicaciones Central-FO con los topics de Kafka.
+     * @param ipBroker
+     * @param puertoBroker
+     * @param idOperador
+     * @return consumidor
+     */
+    private static KafkaConsumer<String, String> crearConsumidor(String ipBroker, String puertoBroker) {
+        String bootstrapServers = ipBroker + ":" + puertoBroker;
+
+        // Se establecen las propiedades:
+        Properties props = new Properties();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "grupo-engine");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest"); // Para que solo lea los mensajes nuevos
+    
+        // Se crea el consumidor:
+        KafkaConsumer<String, String> consumidor = new KafkaConsumer<>(props);
+
+        // Suscribir el consumidor a la cola donde Central responde:
+        consumidor.subscribe(Collections.singletonList(TOPIC_CONSUMIDOR));
+
+        return consumidor;
+    }
+
+
+    
+    /**
      * Función principal.
      * @param args
      */
@@ -116,11 +208,17 @@ public class WM_E {
         String ipMonitor = args[2];
         String puertoMonitor = args[3];
 
-        // -----------------------------------------------------
-        // INICIAR HILO PARALELO QUE PUEDE PROVOCAR UNA AVERÍA:
-        // -----------------------------------------------------
+        // ----------------------------------------------
+        // INICIAR HILO PARA PROVOCAR UNA AVERÍA MANUAL:
+        // ----------------------------------------------
         HiloKO hiloKO = new HiloKO();
         hiloKO.start();
+
+        // ----------------------------------------------------------------
+        // INICIAR HILO PARA LA COMUNICACIÓN ENTRE LA CENTRAL Y EL ENGINE:
+        // ----------------------------------------------------------------
+        HiloConsumidorKafka hiloKafka = new HiloConsumidorKafka(ipBroker, puertoBroker);
+        hiloKafka.start();    
 
         // ------------------------
         // CONEXIÓN CON EL MONITOR:

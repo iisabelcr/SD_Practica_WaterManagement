@@ -67,7 +67,7 @@ public class WM_M {
                     // Si todo va bien, no se hace nada. En caso de que se haya recuperado de una avería, hay que notificar a Central:
                     else if (respuesta.equals("OK")) {
                         if (averia) {
-                            notificarCentral("RECUPERACIÓN/" + idWS);
+                            notificarCentral("AVERIA_RESUELTA/" + idWS);
                             System.out.println("Se ha solucionado la avería");
                             averia = false;
                         }
