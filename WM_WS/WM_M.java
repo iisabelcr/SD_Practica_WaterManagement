@@ -2,7 +2,7 @@ import java.io.*;
 import java.net.*;
 public class WM_M {
     /**
-     * Clase interna que permite la comunicación entre el Monitor y el Engine de la WS de forma asíncrona
+     * Clase interna que permite la comunicación entre el Monitor y el Engine de la WS de forma asíncrona.
      * HiloServidorEngine
      */
     static class HiloServidorEngine extends Thread {
@@ -97,7 +97,7 @@ public class WM_M {
 
 
     /**
-     * Función que limpia la pantalla de la consola
+     * Función que limpia la pantalla de la consola.
      */
     private static void clear() {
         System.out.print("\033[H\033[2J");
@@ -108,13 +108,10 @@ public class WM_M {
 
     /**
      * Procedimiento que muestra mensajes de iniciación del programa.
-     * @param ipBroker
-     * @param puertoBroker
-     * @param idOperador
      */
     private static void iniciarMonitor() {
         try {
-            System.out.println("Iniciando el monitor...");
+            System.out.println("Iniciando el Monitor de la Estación de riego...");
             Thread.sleep(2000);
             System.out.println("Estableciendo conexión con Central...");
             Thread.sleep(2000);
@@ -129,7 +126,6 @@ public class WM_M {
     /**
      * Función que lee la información procedente del socket.
      * @param socket
-     * @param datos
      * @return datos
      */
     private static String leerSocket(Socket socket) {
@@ -165,7 +161,10 @@ public class WM_M {
 	}
     
 
-
+    /**
+     * Función principal.
+     * @param args
+     */
     public static void main(String[] args) {
         // Si los argumentos son incorrectos:
         if (args.length < 4) {
@@ -217,3 +216,4 @@ public class WM_M {
 // COSAS QUE HACER:
 // Leer la respuesta de registro por parte de central
 // Quiero hacer que los mensajes de los sockets se preparen en funciones, para poder cambiarlos más fácilmente
+// Mostrar la información de la estación y de las respuestas de la central
