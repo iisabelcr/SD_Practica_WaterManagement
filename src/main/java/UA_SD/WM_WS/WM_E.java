@@ -1,3 +1,4 @@
+package UA_SD.WM_WS;
 public class WM_E {
     public static void main(String[] args) {
         // Si los argumentos son incorrectos:

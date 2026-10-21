@@ -1,3 +1,5 @@
+package UA_SD;
+
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -29,20 +31,25 @@ public class WM_FO {
     }
 
 
+
     /**
      * Procedimiento que muestra mensajes de iniciación del programa.
      * @param ipBroker
      * @param puertoBroker
      * @param idOperador
-     * @throws InterruptedException
      */
-    private static void iniciarAplicacion(String ipBroker, String puertoBroker, String idOperador) throws InterruptedException {
-        System.out.println("Iniciando la aplicación...");
-        Thread.sleep(2000);
-        System.out.println("ID del operador: " + idOperador);
-        Thread.sleep(2000);
-        System.out.println("Conectando al Broker del gestor de colas en: " + ipBroker + ":" + puertoBroker);
-        Thread.sleep(2000);
+    private static void iniciarAplicacion(String ipBroker, String puertoBroker, String idOperador) {
+        try {
+            System.out.println("Iniciando la aplicación...");
+            Thread.sleep(2000);
+            System.out.println("ID del operador: " + idOperador);
+            Thread.sleep(2000);
+            System.out.println("Conectando al Broker del gestor de colas en: " + ipBroker + ":" + puertoBroker);
+            Thread.sleep(2000);
+        } catch (InterruptedException e)  {
+            System.err.println("Fallo al iniciar la aplicación");
+        }
+
     }
 
 
@@ -51,7 +58,7 @@ public class WM_FO {
      * Función que muestra y procesa el menú.
      * @return opción escogida
      */
-    private static int mostrarMenu(Scanner scanner) {    
+    private static int mostrarMenu(Scanner scanner) {
         System.out.println("+-----------------------------+");
         System.out.println("|       FIELD OPERATORS       |");
         System.out.println("+-----------------------------+\n");
@@ -61,7 +68,7 @@ public class WM_FO {
         System.out.println("3. Ver estaciones de riego disponibles\n");
 
         int opcion = -1;
-        boolean correcto = false; 
+        boolean correcto = false;
 
         // Se seguirá pidiendo la opción hasta que se inserte un número correcto
         while (!correcto) {
@@ -72,7 +79,7 @@ public class WM_FO {
                 if (opcion >= 1 && opcion <= 3) {
                     correcto = true;
                 } else {
-                   System.out.println("No existe esa opción"); 
+                    System.out.println("No existe esa opción");
                 }
             } catch (NumberFormatException e) {
                 System.out.println("La opción debe ser numérica");
@@ -124,7 +131,7 @@ public class WM_FO {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest"); // Para que solo lea los mensajes nuevos
-    
+
         // Se crea el consumidor:
         KafkaConsumer<String, String> consumidor = new KafkaConsumer<>(props);
 
@@ -133,17 +140,15 @@ public class WM_FO {
 
         return consumidor;
     }
-   
-    
+
+
 
     /**
      * Método que lee el fichero de los servicios a solicitar y se encarga del procesamiento y envío
      * de cada solicitud. Cada línea del archivo tendrá el código de la WS que se quiera activar.
-     * @param ipBroker
-     * @param puertoBroker
      * @param idOperador
      * @param servicios
-    */
+     */
     private static void ficheroSolicitudes(KafkaProducer<String, String> productor, String idOperador, String servicios) {
         try (BufferedReader reader = new BufferedReader(new FileReader(servicios))) {
             String linea;
@@ -172,7 +177,7 @@ public class WM_FO {
 
         } catch (IOException e) {
             System.err.println("Error durante la lectura del archivo: " + e.getMessage());
-        
+
         } catch (InterruptedException e) {
             System.err.println("Error durante la espera: " + e.getMessage());
         }
@@ -206,7 +211,7 @@ public class WM_FO {
                 if (segundos > 0) {
                     tiempoValido = true;
                 } else {
-                   System.out.println("Los segundos no pueden ser negativos"); 
+                    System.out.println("Los segundos no pueden ser negativos");
                 }
             } catch (NumberFormatException e) {
                 System.out.println("Debes introducir un número entero válido");
@@ -255,7 +260,7 @@ public class WM_FO {
         // RECEPCIÓN DE LAS ESTACIONES ACTIVAS (CONSUMIDOR):
         // --------------------------------------------------
         ConsumerRecords<String, String> registrosC = consumidor.poll(Duration.ofSeconds(5)); // Buscamos mensajes en un tiempo máximo de 5 segundos
-        
+
         if (registrosC.isEmpty()) {
             System.out.println("No se ha recibido respuesta de central");
         } else {
@@ -278,8 +283,8 @@ public class WM_FO {
         // Si los argumentos son incorrectos:
         if (args.length < 3 || args.length > 4) {
             System.out.println("Debe indicar la IP y puerto del Broker del gestor de colas y el ID del operador");
-			System.out.println("$./WM_FO ip_broker puerto_broker id_operador [fichero_servicios]");
-			System.exit(1);
+            System.out.println("$./WM_FO ip_broker puerto_broker id_operador [fichero_servicios]");
+            System.exit(1);
         }
 
         boolean siFichero = false; // Indica que existe fichero
