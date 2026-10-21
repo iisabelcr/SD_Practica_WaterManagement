@@ -1,7 +1,37 @@
 import java.io.*;
 import java.net.*;
+import java.util.Scanner;
 
 public class WM_E {
+    /**
+     * Atributo de la clase que determina si la WS está averiada
+     */
+    static boolean averia = false; // Determina si la WS está averiada
+
+
+    
+    /**
+     * Clase interna que permite gestionar la lógica de provocar averías en un hilo distinto al principal
+     * HiloKO
+     */
+    static class HiloKO extends Thread {
+        public void run() {
+            Scanner scanner = new Scanner(System.in);
+
+            while (true) {
+                System.out.println("Pulsa cualquier tecla para provocar una avería manual: ");
+                scanner.nextLine(); // El hilo se queda parado hasta que se pulse una tecla
+                averia = true;
+
+                System.out.println("Estación averiada, pulsa cualquier tecla para arreglarla: ");
+                scanner.nextLine(); // El hilo se queda parado hasta que se pulse una tecla
+                averia = false;
+            }
+        }
+    }
+
+
+
     /**
      * Función que limpia la pantalla de la consola.
      */
@@ -86,6 +116,12 @@ public class WM_E {
         String ipMonitor = args[2];
         String puertoMonitor = args[3];
 
+        // -----------------------------------------------------
+        // INICIAR HILO PARALELO QUE PUEDE PROVOCAR UNA AVERÍA:
+        // -----------------------------------------------------
+        HiloKO hiloKO = new HiloKO();
+        hiloKO.start();
+
         // ------------------------
         // CONEXIÓN CON EL MONITOR:
         // ------------------------
@@ -93,14 +129,19 @@ public class WM_E {
             iniciarEngine();
             
             Socket socketMonitor = new Socket(ipMonitor, Integer.parseInt(puertoMonitor));
-
+            
             // Bucle infinito que espera la comprobación de estado de salud por parte del Monitor
             while (true) {
                 String respuesta = leerSocket(socketMonitor);
 
                 // No es necesario comprobar el mensaje, el Monitor siempre mandará al Engine un mensaje de STATUS:
                 if (respuesta != null) {
-                    escribirSocket(socketMonitor, "OK");
+                    if (!averia) {
+                        escribirSocket(socketMonitor, "OK");
+
+                    } else {
+                        escribirSocket(socketMonitor, "KO");
+                    }
                 }
             }
         } catch (Exception e) {
