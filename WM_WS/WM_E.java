@@ -189,7 +189,7 @@ public class WM_E {
     }
 
 
-    
+
     /**
      * Función principal.
      * @param args
@@ -248,3 +248,7 @@ public class WM_E {
         }
     }
 }
+
+// COSAS QUE FALTAN:
+// Hacer función para iniciar el riego
+// Gestionar el productor para mandar mensajes a central
