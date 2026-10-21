@@ -40,3 +40,4 @@ build/
 wm_central.db
 .idea
 .mvn
+.idea/
