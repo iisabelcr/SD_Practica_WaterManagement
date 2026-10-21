@@ -100,7 +100,7 @@ public class WM_Central {
             /*Tenia puesto "5000"=> que el consumidor de Kafka intentara conectarse
             al puerto del Socket de Java de la propia Central en lugar de al servidor de Kafka de Docker*/
             central.incioconsumidorkafkaoperario("localhost","9092","fo_central");
-            central.incioconsumidorkafkaengine("localhost","9092","fo_central");
+            central.incioconsumidorkafkaengine("localhost","9092","engine_central");
             central.inicioproductokafka("localhost","9092");
             //Se crea el socket (es decir la Central abre un puerto y se queda esperan a que las estaciones se conecten).
             try(ServerSocket servidorsocket= new ServerSocket(Integer.parseInt(puerto))){
