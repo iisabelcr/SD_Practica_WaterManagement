@@ -32,6 +32,7 @@ public class WM_FO {
 
 
 
+
     /**
      * Procedimiento que muestra mensajes de iniciación del programa.
      * @param ipBroker
@@ -49,7 +50,7 @@ public class WM_FO {
         } catch (InterruptedException e)  {
             System.err.println("Fallo al iniciar la aplicación");
         }
-
+        
     }
 
 
@@ -157,8 +158,8 @@ public class WM_FO {
             while ((linea = reader.readLine()) != null) {
                 System.out.println("Leyendo solicitud de servicio: " + linea);
 
-                // Se prepara la trama y la publicación en la cola. La trama será: "codOperador/codOperacion/estacion/segundos". En cada línea del fichero aparecerá el formato "estacion/segundos"
-                String mensaje = idOperador + "/01/" + linea;
+                // Se prepara la trama y la publicación en la cola. La trama será: "RIEGO/codOperador/estacion/segundos". En cada línea del fichero aparecerá el formato "estacion/segundos"
+                String mensaje = "RIEGO/" + idOperador + "/" + linea;
                 ProducerRecord<String, String> registro = new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, mensaje);
 
                 // Se envía el mensaje de forma asíncrona, comprobando si ha fallado el envío o no:
@@ -218,8 +219,8 @@ public class WM_FO {
             }
         }
 
-        // Se prepara la trama a enviar y la publicación en la cola. La trama será: "codOperador/codOperacion/estacion/segundos". En cada línea del fichero aparecerá el formato "estacion/segundos"
-        String mensaje = idOperador + "/01/" + estacion +  "/" + segundos;
+        // Se prepara la trama a enviar y la publicación en la cola. La trama será: "RIEGO/codOperador/estacion/segundos". En cada línea del fichero aparecerá el formato "estacion/segundos"
+        String mensaje = "RIEGO/" + idOperador + "/" + estacion +  "/" + segundos;
         ProducerRecord<String, String> registro = new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, mensaje);
 
         // Se envía el mensaje de forma asíncrona, comprobando si ha fallado el envío o no:
@@ -240,8 +241,8 @@ public class WM_FO {
         // ---------------------------------------------------------
         // PETICIÓN DE ENVÍO DE LAS ESTACIONES ACTIVAS (PRODUCTOR):
         // ---------------------------------------------------------
-        // Primero, solicitamos a Central el envío de todas las estaciones activas actualmente
-        String mensaje = idOperador + "/02";
+        // Primero, solicitamos a Central el envío de todas las estaciones activas actualmente. Formato: "ESTACIONES/idOperador"
+        String mensaje = "ESTACIONES/" + idOperador;
         ProducerRecord<String, String> registroP = new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, mensaje);
 
         // Se envía el mensaje de forma asíncrona, comprobando si ha fallado el envío o no:
