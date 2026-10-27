@@ -52,13 +52,11 @@ public class WM_Central {
             DatabaseManager.insertarEstacion(estacion);
         }
     }
-
     public void setOperarios(List<Operario> operarios) {
         if (operarios != null) {
             this.operarios = operarios;
         }
     }
-
     public boolean actualEstadoEstacion(String id,String nueEstado){
         boolean aux=false;
         for(int i=0;i<estaciones.size() && !aux ;i++){
@@ -71,7 +69,6 @@ public class WM_Central {
         }
         return aux;
     }
-
     public void setestaciones(List<Estacion> estaciones) {
         if (estaciones != null) {
             this.estaciones = estaciones;
@@ -284,7 +281,6 @@ public class WM_Central {
             this.producer.send(new ProducerRecord<>(topic, mensaje));
         }
     }
-
     public void enviarmensajekafka(String mensaje, String topic,String key){
         if(this.producer!=null){
             this.producer.send(new ProducerRecord<>(topic, key ,mensaje));
