@@ -41,3 +41,11 @@ wm_central.db
 .idea
 .mvn
 .idea/
+target/classes/UA_SD/ClientHandler.class
+target/classes/UA_SD/ClientHandler.class
+target/classes/UA_SD/WM_WS/WM_E.class
+target/classes/UA_SD/WM_FO.class
+target/classes/UA_SD/WM_Central$1.class
+target/classes/UA_SD/WM_Central.class
+target/classes/UA_SD/DatabaseManager.class
+target/classes/UA_SD/ClientHandler.class
