@@ -81,7 +81,7 @@ public class ClientHandler implements Runnable{
                     String mensajeKafka = " ALERTA_FUGA/" + idEstacion;
                     enviarTrama(mensajeKafka,"central_fo");
                     respuesta = "OK/FUGA_REGISTRADA";
-                } else if (parts[1].equalsIgnoreCase("FUGA_RESUELTA")) {
+                } else if (parts[0].equalsIgnoreCase("FUGA_RESUELTA")) {
                     System.out.println("Ya no hay una avería en la estación " + idEstacion);
                     String mensajeKafka = " FUGA_RESUELTA/" + idEstacion;
                     enviarTrama(mensajeKafka,"central_fo");
