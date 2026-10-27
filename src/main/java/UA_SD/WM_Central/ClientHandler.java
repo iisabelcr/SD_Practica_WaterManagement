@@ -1,4 +1,4 @@
-package UA_SD;
+package UA_SD.WM_Central;
 
 import UA_SD.MODELAJEDATOS.Estacion;
 
@@ -53,7 +53,7 @@ public class ClientHandler implements Runnable{
             String[] parts =trama.split("/");
             if (parts.length>=1){
                 if(parts[0].equalsIgnoreCase("REGISTRO") && parts.length>=3){
-                    Estacion estacionmdb=DatabaseManager.obtenerEstacion(parts[1]);
+                    Estacion estacionmdb= DatabaseManager.obtenerEstacion(parts[1]);
                     //Se comprueba si estaba antes en la base de datos
                     if(estacionmdb==null){
                         Estacion nueva =new Estacion(parts[1],parts[2]);
@@ -75,6 +75,17 @@ public class ClientHandler implements Runnable{
                     else{
                         respuesta = " STATUS/ERROR/Estacion no encontrada";
                     }
+                }
+                else if (parts[0].equalsIgnoreCase("FUGA")) {
+                    System.out.println("No hay riego porque hay una avería en la estación " + idEstacion);
+                    String mensajeKafka = " ALERTA_FUGA/" + idEstacion;
+                    enviarTrama(mensajeKafka,"central_fo");
+                    respuesta = "OK/FUGA_REGISTRADA";
+                } else if (parts[1].equalsIgnoreCase("FUGA_RESUELTA")) {
+                    System.out.println("Ya no hay una avería en la estación " + idEstacion);
+                    String mensajeKafka = " FUGA_RESUELTA/" + idEstacion;
+                    enviarTrama(mensajeKafka,"central_fo");
+                    respuesta = "OK/FUGA_RESUELTA_REGISTRADA";
                 }
                 else{
                     respuesta = " STATUS/ERROR/Operacion no valida";
