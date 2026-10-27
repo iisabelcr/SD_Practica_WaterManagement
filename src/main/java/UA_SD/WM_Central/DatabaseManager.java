@@ -16,7 +16,7 @@ public class DatabaseManager {
     //en ese instante es como un archivo vacio en la carpeta de tu proyecto. A continuacion, cuando tu metodo
     //initDatabase() ejecuta los comandos, SQLite crea las tablas dentro de ese archivo wm-central.db recien
     //generado. Si ya existe:Simplemente abre la base de datos existente y deja las tablas como estaban.
-    private static final String DB_URL = "jdbc:sqlite:wm_central.db";
+    private static final String DB_URL = "jdbc:sqlite:" + System.getenv().getOrDefault("DB_PATH", "wm_central.db");
     //Abre y retorna la conexión activa con el archivo wm_central.db.
     //(Si el archivo de la base de datos no existe, SQLite lo crea automáticamente en ese instante)
     public static Connection connect() throws SQLException {
