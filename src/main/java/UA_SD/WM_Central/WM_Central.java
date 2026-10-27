@@ -1,4 +1,4 @@
-package UA_SD;
+package UA_SD.WM_Central;
 
 import UA_SD.MODELAJEDATOS.Estacion;
 import UA_SD.MODELAJEDATOS.Operario;
