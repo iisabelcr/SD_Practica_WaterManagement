@@ -1,4 +1,4 @@
-package UA_SD;
+package UA_SD.WM_FO;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
