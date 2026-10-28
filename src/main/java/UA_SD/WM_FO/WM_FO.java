@@ -32,7 +32,6 @@ public class WM_FO {
 
 
 
-
     /**
      * Procedimiento que muestra mensajes de iniciación del programa.
      * @param ipBroker
@@ -42,11 +41,11 @@ public class WM_FO {
     private static void iniciarAplicacion(String ipBroker, String puertoBroker, String idOperador) {
         try {
             System.out.println("Iniciando la aplicación...");
-            Thread.sleep(2000);
+            Thread.sleep(1500);
             System.out.println("ID del operador: " + idOperador);
-            Thread.sleep(2000);
+            Thread.sleep(1500);
             System.out.println("Conectando al Broker del gestor de colas en: " + ipBroker + ":" + puertoBroker);
-            Thread.sleep(2000);
+            Thread.sleep(1500);
         } catch (InterruptedException e)  {
             System.err.println("Fallo al iniciar la aplicación");
         }
@@ -66,7 +65,8 @@ public class WM_FO {
 
         System.out.println("1. Procesar fichero de solicitudes de riego");
         System.out.println("2. Solicitar suministro");
-        System.out.println("3. Ver estaciones de riego disponibles\n");
+        System.out.println("3. Ver estaciones de riego disponibles");
+        System.out.println("4. Salir\n");
 
         int opcion = -1;
         boolean correcto = false;
@@ -77,7 +77,7 @@ public class WM_FO {
                 System.out.println("Selecciona una opción: ");
                 opcion = Integer.parseInt(scanner.nextLine());
 
-                if (opcion >= 1 && opcion <= 3) {
+                if (opcion >= 1 && opcion <= 4) {
                     correcto = true;
                 } else {
                     System.out.println("No existe esa opción");
@@ -288,17 +288,15 @@ public class WM_FO {
             System.exit(1);
         }
 
-        boolean siFichero = false; // Indica que existe fichero
-
         // Guardamos la información:
         String ipBroker = args[0];
         String puertoBroker = args[1];
         String idOperador = args[2];
 
         // Si se ha introducido un fichero de solicitud de servicios:
+        String servicios = null;
         if (args.length == 4) {
-            String servicios = args[3];
-            siFichero = true;
+            servicios = args[3];
         }
 
         // -----------------------------
@@ -308,10 +306,38 @@ public class WM_FO {
         KafkaProducer<String, String> productor = crearProductor(ipBroker, puertoBroker);
         KafkaConsumer<String, String> consumidor = crearConsumidor(ipBroker, puertoBroker, idOperador);
 
+        iniciarAplicacion(ipBroker, puertoBroker, idOperador); // Se inicia la aplicación
+        clear();
+
+        boolean salir = false;
+        while (!salir) {
+            int opcion = mostrarMenu(scanner); // Se muestra el menú y se guarda la opción escogida
+
+            switch (opcion) {
+                case 1:
+                    if (servicios == null) {
+                        System.out.println("No se ha indicado un fichero de servicios al iniciar la aplicación");
+                    } else {
+                        ficheroSolicitudes(productor, idOperador, servicios);
+                    }
+                    break;
+                case 2:
+                    crearSolicitud(scanner, productor, idOperador);
+                    break;
+                case 3:
+                    mostrarEstaciones(productor, consumidor, idOperador);
+                    break;
+                case 4:
+                    salir = true;
+                    break;
+            }
+        }
+
+        // Se cierran todas las conexiones y el scanner:
         productor.flush();
         productor.close();
         consumidor.close();
-        scanner.close(); // Se cierra el scanner
+        scanner.close();
     }
 }
 
