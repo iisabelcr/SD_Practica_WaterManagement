@@ -21,8 +21,11 @@ import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -45,7 +48,7 @@ public class WM_FO {
         public HiloConsumidor(KafkaConsumer<String, String> consumidor, String idOperador) {
             this.consumidor = consumidor;
             this.idOperador = idOperador;
-            setDaemon(true);
+            setDaemon(true); 
         }
 
         public CountDownLatch getListo() {
@@ -81,7 +84,7 @@ public class WM_FO {
                     }
                 }
             } catch (WakeupException e) {
-                // Cierre normal, no es un erro
+                // Cierre normal, no es un error
             } catch (Exception e) {
                 System.err.println("Error en el consumidor: " + e.getMessage());
             } finally {
@@ -257,35 +260,101 @@ public class WM_FO {
 
 
     /**
+     * Función que espera en la cola hasta que llegue un evento de un tipo en concreto y lo devuelve. Devuelve null si se pasa del tiempo pasado por parametro (en segundos).
+     * @param hilo
+     * @param idOperacion es el tipo de evento que se espera recibir
+     * @param estacion solo acepta los eventos de esa estación
+     * @param timeout
+     */
+    private static String[] esperarEvento(HiloConsumidor hilo, String idOperacion, String idEstacion, long timeout) {
+        long limiteTiempo = System.currentTimeMillis() + timeout * 1000;
+
+        try {
+            while (true) {
+                long restante = limiteTiempo - System.currentTimeMillis();
+                if (restante <= 0) return null; 
+
+                String[] evento = hilo.getEventos().poll(restante, TimeUnit.MILLISECONDS);
+                if (evento == null) return null; // Se acabó el tiempo
+
+                if (idOperacion != null && !evento[0].equals(idOperacion)) continue;
+                if (idOperacion == null && evento[0].equals("STATIONS_LIST")) continue; // Lista antigua, se ignora
+                if (idEstacion != null && !evento[1].equals(idEstacion)) continue;
+
+                return evento;
+            }
+        } catch (InterruptedException e) {
+            System.err.println("Fallo en el hilo consumidor: " + e.getMessage());
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+
+
+    /**
+     * Se encarga de realizar la petición de riego a Central y comprobar si hay respuesta o no. 
+     * @param productor
+     * @param hilo
+     * @param idOperador
+     * @param estacion
+     * @param segundos
+     */
+    private static void solicitarRiego(KafkaProducer<String, String> productor, HiloConsumidor hilo, String idOperador, String idEstacion, int segundos) {
+        hilo.getEventos().clear(); // Se descartan los eventos de peticiones anteriores
+
+        String mensaje = "WATERING_REQUEST/" + idOperador + "/" + idEstacion + "/" + segundos;
+
+        try {
+            // Se publica el mensaje en la cola. Si no se ha recibido respuesta, lanzará una excepción y no se volverá a enviar:
+            productor.send(new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, mensaje)).get(5, TimeUnit.SECONDS);
+
+        } catch (Exception e) {
+            System.err.println("Central no ha respondido a la solicitud");
+            return;
+        }
+
+        System.out.println("Solicitud enviada. Esperando a Central...");
+
+        // Espera al evento lo que dure el riego más un margen de 20 segundos:
+        String[] evento = esperarEvento(hilo, null, idEstacion, segundos + 20);
+
+        if (evento == null) {
+            System.out.println("Central no ha respondido a tiempo");
+
+        } else if (evento[0].equals("WATERING_END")) {
+            System.out.println("Resumen -> duración: " + evento[2] + " s | volumen total: " + evento[3] + " L");
+        }
+    }
+
+
+
+    /**
      * Método que lee el fichero de los servicios a solicitar y se encarga del procesamiento y envío
      * de cada solicitud. Cada línea del archivo tendrá el código de la WS que se quiera activar.
+     * @param productor
+     * @param hilo
      * @param idOperador
      * @param servicios
      */
-    private static void ficheroSolicitudes(KafkaProducer<String, String> productor, String idOperador, String servicios) {
+    private static void ficheroSolicitudes(KafkaProducer<String, String> productor, HiloConsumidor hilo, String idOperador, String servicios) {
         try (BufferedReader reader = new BufferedReader(new FileReader(servicios))) {
             String linea;
 
             // Se lee cada solicitud de servicio del fichero:
             while ((linea = reader.readLine()) != null) {
+                if (linea.isBlank()) continue; // Si la linea está vacía se omite
+
+                String[] info = linea.trim().split("/");
+
+                if (info.length != 2) {
+                    System.out.println("Línea con formato incorrecto, se omite: " + linea);
+                    continue;
+                }
+
                 System.out.println("Leyendo solicitud de servicio: " + linea);
-
-                // Se prepara la trama y la publicación en la cola. La trama será: "WATERING_REQUEST/codOperador/estacion/segundos". En cada línea del fichero aparecerá el formato "estacion/segundos"
-                String mensaje = "WATERING_REQUEST/" + idOperador + "/" + linea;
-                ProducerRecord<String, String> registro = new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, mensaje);
-
-                // Se envía el mensaje de forma asíncrona, comprobando si ha fallado el envío o no:
-                productor.send(registro, (metadata, e) -> {
-                    if (e == null) {
-                        System.out.println("Solicitud enviada con éxito a Central");
-                    } else {
-                        System.err.println("Ha fallado el envío de la solicitud");
-                    }
-                });
-
-                // Se cierra la conexión:
-                productor.flush(); // Envía todos los registros acumulados en el búfer
-                Thread.sleep(4000); // Pausa de 4 segundos
+                solicitarRiego(productor, hilo, idOperador, info[0], Integer.parseInt(info[1]));
+                Thread.sleep(4000); // Se espera 4 segundos antes de leer la siguiente petición 
             }
 
         } catch (IOException e) {
@@ -302,84 +371,136 @@ public class WM_FO {
      * Función que permite crear una solicitud de riego dirigida hacia Central.
      * @param scanner
      * @param productor
+     * @param hilo
      * @param idOperador
      */
-    private static void crearSolicitud(Scanner scanner, KafkaProducer<String, String> productor, String idOperador) {
-        String estacion;
+    private static void crearSolicitud(Scanner scanner, KafkaProducer<String, String> productor, HiloConsumidor hilo, String idOperador) {
+        System.out.println("Consultando estaciones disponibles...");
+        List<String[]> estaciones = pedirEstaciones(productor, hilo, idOperador);
+
+        if (estaciones == null) {
+            System.out.println("No se ha recibido respuesta de Central. No se puede solicitar el riego.");
+            return;
+        }
+
+        // Si no hay estaciones encendidas:
+        if (estaciones.isEmpty()) {
+            System.out.println("No hay estaciones disponibles ahora mismo.");
+            return;
+        }
+
+        imprimirEstaciones(estaciones);
+
+        // Se pide la estación hasta que sea una de la lista (o se cancela):
+        String estacion = null;
+        while (estacion == null) {
+            System.out.println("Introduce el ID de la estación deseada (escribe 'q' para cancelar): ");
+            String entrada = scanner.nextLine().trim();
+
+            if (entrada.equalsIgnoreCase("q")) {
+                return;
+            }
+
+            for (String[] est : estaciones) {
+                if (est[0].equalsIgnoreCase(entrada)) {
+                    estacion = est[0]; // Se usa el ID tal y como lo envía Central
+                    break;
+                }
+            }
+            
+            if (estacion == null) {
+                System.out.println("Esa estación no está entre las disponibles.");
+            }
+        }
+
+        // Se piden los segundos hasta que sean un entero mayor que 0:
         int segundos = 0;
-        boolean tiempoValido = false;
 
-        System.out.println("Estaciones disponibles actualmente: ");
-        // AQUÍ VA EL LISTADO DE ESTACIONES DISPONIBLES
-
-        System.out.println("Introduce el nombre de la estación deseada: ");
-        estacion = scanner.nextLine();
-        // FALTA VALIDAR EL NOMBRE DE LA ESTACIÓN INSERTADO
-
-        while (!tiempoValido) {
+        while (segundos <= 0) {
             try {
                 System.out.println("Introduce el tiempo que permanecerá activada (en segundos): ");
-                segundos = Integer.parseInt(scanner.nextLine());
+                segundos = Integer.parseInt(scanner.nextLine().trim());
 
-                if (segundos > 0) {
-                    tiempoValido = true;
-                } else {
-                    System.out.println("Los segundos no pueden ser negativos");
+                if (segundos <= 0) {
+                    System.out.println("Los segundos deben ser mayores que 0");
                 }
+
             } catch (NumberFormatException e) {
                 System.out.println("Debes introducir un número entero válido");
             }
         }
 
-        // Se prepara la trama a enviar y la publicación en la cola. La trama será: "WATERING_REQUEST/codOperador/estacion/segundos". En cada línea del fichero aparecerá el formato "estacion/segundos"
-        String mensaje = "WATERING_REQUEST/" + idOperador + "/" + estacion +  "/" + segundos;
-        ProducerRecord<String, String> registro = new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, mensaje);
-
-        // Se envía el mensaje de forma asíncrona, comprobando si ha fallado el envío o no:
-        productor.send(registro, (metadata, e) -> {
-            if (e == null) {
-                System.out.println("Solicitud enviada con éxito a Central");
-            } else {
-                System.err.println("Ha fallado el envío de la solicitud");
-            }
-        });
-
-        productor.flush(); // Envía el registro
+        // Finalmente, se realiza la solicitud
+        solicitarRiego(productor, hilo, idOperador, estacion, segundos); 
     }
 
 
 
-    private static void mostrarEstaciones(KafkaProducer<String, String> productor, KafkaConsumer<String, String> consumidor, String idOperador) {
-        // ---------------------------------------------------------
-        // PETICIÓN DE ENVÍO DE LAS ESTACIONES ACTIVAS (PRODUCTOR):
-        // ---------------------------------------------------------
-        // Primero, solicitamos a Central el envío de todas las estaciones activas actualmente. Formato: "STATIONS_LIST/idOperador"
-        String mensaje = "STATIONS_LIST/" + idOperador;
-        ProducerRecord<String, String> registroP = new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, mensaje);
+    /**
+     * Envía una solicitud a Central para que le mande todas las estaciones que están disponibles. 
+     * @param productor
+     * @param hilo
+     * @param idOperador
+     * @return estaciones
+     */
+    private static List<String[]> pedirEstaciones(KafkaProducer<String, String> productor, HiloConsumidor hilo, String idOperador) {
+        hilo.getEventos().clear(); // Se descartan los eventos de peticiones anteriores
 
-        // Se envía el mensaje de forma asíncrona, comprobando si ha fallado el envío o no:
-        productor.send(registroP, (metadata, e) -> {
-            if (e != null) {
-                System.err.println("Ha fallado la comunicación con Central");
-                return;
-            }
-        });
+        try {
+            // Se publica el mensaje en la cola. Si no se ha recibido respuesta, lanzará una excepción y no se volverá a enviar:
+            productor.send(new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, "STATIONS_LIST/" + idOperador)).get(5, TimeUnit.SECONDS);
 
-        productor.flush(); // Envía el registro
+        } catch (Exception e) {
+            System.err.println("No se ha podido comunicar con Central");
+            return null;
+        }
 
-        System.out.println("Esperando respuesta de Central...");
+        String[] evento = esperarEvento(hilo, "STATIONS_LIST", null, 10);
+        if (evento == null) return null; // Central no ha respondido
 
-        // --------------------------------------------------
-        // RECEPCIÓN DE LAS ESTACIONES ACTIVAS (CONSUMIDOR):
-        // --------------------------------------------------
-        ConsumerRecords<String, String> registrosC = consumidor.poll(Duration.ofSeconds(5)); // Buscamos mensajes en un tiempo máximo de 5 segundos
+        List<String[]> estaciones = new ArrayList<>(); // Lista que almacena la infomación de cada estación
 
-        if (registrosC.isEmpty()) {
-            System.out.println("No se ha recibido respuesta de central");
+        for (int i = 1; i < evento.length; i++) {
+            if (evento[i].equals("NONE")) break;
+            estaciones.add(evento[i].split(":"));
+        }
+
+        return estaciones;
+    }
+
+
+
+    /**
+     * Función que ordena e imprime cada estación de la lista pasada por referencia.
+     * @param lista
+     */
+    private static void imprimirEstaciones(List<String[]> estaciones) {
+        System.out.printf("%-10s | %s%n", "ID", "UBICACIÓN");
+        for (String[] est : estaciones) {
+            System.out.printf("%-10s | %s%n", est[0], est[1]);
+        }
+    }
+
+
+
+    /**
+     * Muestra por pantalla las estaciones disponibles.
+     * @param productor
+     * @param hilo
+     * @param idOperador
+     * @return lista de estaciones
+     */
+    private static void mostrarEstaciones(KafkaProducer<String, String> productor, HiloConsumidor hilo, String idOperador) {
+        List<String[]> estaciones = pedirEstaciones(productor, hilo, idOperador); // Se piden las estaciones
+
+        if (estaciones == null) {
+            System.out.println("No se ha recibido respuesta de Central");
+
+        } else if (estaciones.isEmpty()) {
+            System.out.println("No hay estaciones disponibles ahora mismo");
+
         } else {
-            for (ConsumerRecord<String, String> registroC : registrosC) {
-                // AQUÍ SE PROCESAN LAS ESTACIONES ENVIADAS POR CENTRAL
-            }
+            imprimirEstaciones(estaciones); // Se imprimen las estaciones
         }
     }
 
@@ -444,14 +565,14 @@ public class WM_FO {
                     if (servicios == null) {
                         System.out.println("No se ha indicado un fichero de servicios al iniciar la aplicación");
                     } else {
-                        ficheroSolicitudes(productor, idOperador, servicios);
+                        ficheroSolicitudes(productor, hilo, idOperador, servicios);
                     }
                     break;
                 case 2:
-                    crearSolicitud(scanner, productor, idOperador);
+                    crearSolicitud(scanner, productor, hilo, idOperador);
                     break;
                 case 3:
-                    mostrarEstaciones(productor, consumidor, idOperador);
+                    mostrarEstaciones(productor, hilo, idOperador);
                     break;
                 case 4:
                     salir = true;
