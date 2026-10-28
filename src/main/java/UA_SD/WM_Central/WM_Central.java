@@ -318,23 +318,23 @@ public class WM_Central {
                                     Estacion est = DatabaseManager.obtenerEstacion(idEstacion);
                                     String idOperario = (est != null) ? est.getOperarioId() : null;
 
-                                    if (trama[0].equalsIgnoreCase("RESPUESTA_RIEGO") && trama.length >= 3) {
+                                    if (trama[0].equalsIgnoreCase("WATERING_RESPONSE") && trama.length >= 3) {
                                         String estado = trama[2];
                                         if (estado.equalsIgnoreCase("OK")) {
                                             System.out.println("Riego iniciado con éxito en la estación " + idEstacion);
-                                            String mensajeKafka = "RESPUESTA_RIEGO/" + idEstacion + "/OK";
+                                            String mensajeKafka = "WATERING_RESPONSE/" + idEstacion + "/OK";
                                             enviarmensajekafka(mensajeKafka, "central_fo", idOperario);
                                         } else {
-                                            String mensajeKafka = "RESPUESTA_RIEGO/" + idEstacion + "/NOK";
+                                            String mensajeKafka = "WATERING_RESPONSE/" + idEstacion + "/NOK";
                                             enviarmensajekafka(mensajeKafka, "central_fo", idOperario);
                                         }
-                                    } else if (trama[0].equalsIgnoreCase("DATOS_RIEGO") && trama.length >= 4) {
+                                    } else if (trama[0].equalsIgnoreCase("WATERING_DATA") && trama.length >= 4) {
                                         double caudal = Double.parseDouble(trama[2].replace(',', '.'));
                                         double volumen = Double.parseDouble(trama[3].replace(',', '.'));
                                         System.out.println("Mira funciona bien los datos de riego mira esto " + idEstacion + caudal + volumen);
-                                        String mensajeKafka = "DATOS_RIEGO/" + idEstacion + "/" + caudal + "/" + volumen;
+                                        String mensajeKafka = "WATERING_DATA/" + idEstacion + "/" + caudal + "/" + volumen;
                                         enviarmensajekafka(mensajeKafka, "central_fo", idOperario);
-                                    } else if (trama[0].equalsIgnoreCase("FIN_RIEGO") && trama.length >= 4) {
+                                    } else if (trama[0].equalsIgnoreCase("WATERING_END") && trama.length >= 4) {
                                         double tiempo = Double.parseDouble(trama[2].replace(',', '.'));
                                         double volumen = Double.parseDouble(trama[3].replace(',', '.'));
                                         System.out.println("OOOOOOOOOOO SE HA FINALIZADO" + idEstacion + tiempo + volumen);
@@ -350,7 +350,7 @@ public class WM_Central {
                                         }
                                         WM_Central.this.actualEstadoEstacion(idEstacion, "AVAILABLE");
 
-                                        String mensajeKafka = "FIN_RIEGO/" + idEstacion + "/" + tiempo + "/" + volumen;
+                                        String mensajeKafka = "WATERING_END/" + idEstacion + "/" + tiempo + "/" + volumen;
                                         enviarmensajekafka(mensajeKafka, "central_fo", idOperario);
                                     }
                                     else {
@@ -408,7 +408,7 @@ public class WM_Central {
                                         if (llimpia) {
                                             ClientHandler handler = WM_Central.this.getMapeoestaciones().get(idEstacion);
                                             if (handler != null) {
-                                                String mensaje = "SOLICITUD_RIEGO/" + idOperario + "/" + idEstacion + "/" + segundos;
+                                                String mensaje = "WATERING_REQUEST/" + idOperario + "/" + idEstacion + "/" + segundos;
                                                 handler.enviarTrama(mensaje, "central_engine");
                                             } else {
                                                 System.out.println("La estación no está conectada por Socket");
@@ -417,7 +417,7 @@ public class WM_Central {
                                     }
                                     // CASO 02: Petición de Listado de Estaciones Disponibles
                                     else if (codOperacion.equalsIgnoreCase("02")) {
-                                        String listaEst = "LISTA_ESTACIONES";
+                                        String listaEst = "STATIONS_LIST";
                                         for (int i = 0; i < WM_Central.this.getaestaciones().size(); i++) {
                                             if (WM_Central.this.getaestaciones().get(i).getEstado().equalsIgnoreCase("AVAILABLE")) {
                                                 listaEst += "/" + WM_Central.this.getaestaciones().get(i).getId() + ":" + WM_Central.this.getaestaciones().get(i).getUbicacion();
@@ -450,7 +450,7 @@ public class WM_Central {
         boolean aux=false;
         for(int i=0;i<this.estaciones.size() && !aux;i++){
             if(idEstacion.equalsIgnoreCase(estaciones.get(i).getId())){
-                if(!(estaciones.get(i).getEstado().equalsIgnoreCase("AVERIA")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("FUGA")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("OUT_OF_SERVICE"))){
+                if(!(estaciones.get(i).getEstado().equalsIgnoreCase("LEAK")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("OUT_OF_SERVICE"))){
                     Estacion est = estaciones.get(i);
                     est.setOperarioId(idOperario);
                     DatabaseManager.actualizarEstacion(est);
@@ -471,7 +471,7 @@ public class WM_Central {
         boolean aux=false;
         for(int i=0;i<this.estaciones.size() && !aux;i++){
             if(idEstacion.equalsIgnoreCase(estaciones.get(i).getId())){
-                if(!(estaciones.get(i).getEstado().equalsIgnoreCase("LEAK")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("DISCONNECTED")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("OUT_OF_SERVICE"))){
+                if(estaciones.get(i).getEstado().equalsIgnoreCase("AVAILABLE")){
                     estaciones.get(i).setEstado("WATERING");
                     estaciones.get(i).setOperarioId("CENTRAL");
                     DatabaseManager.actualizarEstacion(estaciones.get(i));
@@ -484,5 +484,34 @@ public class WM_Central {
 
     public KafkaProducer<String, String> getProducer() {
         return producer;
+    }
+    public synchronized void procesarDesconexionEstacion(String idEstacion) {
+        boolean aux=false;
+        if (idEstacion == null) return;
+        for (int i=0;i<getaestaciones().size() && !aux;i++) {
+            if (idEstacion.equalsIgnoreCase(getaestaciones().get(i).getId())) {
+                String estadoAnt = getaestaciones().get(i).getEstado();
+                String idOperarioAnt = getaestaciones().get(i).getOperarioId();
+
+                getaestaciones().get(i).setEstado("DISCONNECTED");
+                getaestaciones().get(i).setCaudalactual(0.0);
+                getaestaciones().get(i).setOperarioId(null);
+
+
+                DatabaseManager.actualizarEstacion(getaestaciones().get(i));
+
+                // Hay que avisar al operario de que se desconecta la estacoion que estaba en ese momento regando
+                if ("WATERING".equalsIgnoreCase(estadoAnt) && idOperarioAnt != null) {
+                    System.out.println("La estacion con el " + idEstacion + " se ha desconectado durante un riego activo.");
+
+                    // Enviar aviso de fin/interrupción de riego al operario asignado vía Kafka
+                    if (!idOperarioAnt.equalsIgnoreCase("CENTRAL")) {
+                        String mensajeKafkaFO = "WATERING_END/" + idEstacion + "/0/0";
+                        enviarmensajekafka(mensajeKafkaFO, "central_fo", idOperarioAnt);
+                    }
+                }
+                aux=true;
+            }
+        }
     }
 }

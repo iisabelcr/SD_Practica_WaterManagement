@@ -52,51 +52,51 @@ public class ClientHandler implements Runnable{
         if(trama!=null){
             String[] parts =trama.split("/");
             if (parts.length>=1){
-                if(parts[0].equalsIgnoreCase("REGISTRO") && parts.length>=3){
+                if(parts[0].equalsIgnoreCase("REGISTER") && parts.length>=3){
                     Estacion estacionmdb= DatabaseManager.obtenerEstacion(parts[1]);
                     //Se comprueba si estaba antes en la base de datos
                     if(estacionmdb==null){
                         Estacion nueva =new Estacion(parts[1],parts[2]);
                         this.central.anadirestacion(nueva);
-                        respuesta=" OK/ESTACION_REGISTRADA";
+                        respuesta="OK/STATION_REGISTERED";
                         this.idEstacion=parts[1];
                         this.central.agregarmap(parts[1],this);
                     }
                     else{
                         this.central.actualEstadoEstacion(parts[1],parts[2]);
-                        respuesta=" OK/ESTADO_ACTUALIZADO";
+                        respuesta="OK/STATUS_UPDATED";
                     }
                 }
-                else if(parts[0].equalsIgnoreCase("ACTUALIZAR_ESTADO") && parts.length>=3){
+                else if(parts[0].equalsIgnoreCase("UPDATE_STATUS") && parts.length>=3){
                     boolean aux=this.central.actualEstadoEstacion(parts[1],parts[2]);
                     if(aux){
-                        respuesta=" OK/ESTADO_ACTUALIZADO";
+                        respuesta="OK/STATUS_UPDATED";
                     }
                     else{
-                        respuesta = " STATUS/ERROR/Estacion no encontrada";
+                        respuesta = "STATUS/ERROR/Station not found";
                     }
                 }
-                else if (parts[0].equalsIgnoreCase("FUGA")) {
+                else if (parts[0].equalsIgnoreCase("LEAK")) {
                     System.out.println("No hay riego porque hay una avería en la estación " + idEstacion);
-                    String mensajeKafka = " ALERTA_FUGA/" + idEstacion;
+                    String mensajeKafka = "LEAK_ALERT/" + idEstacion;
                     enviarTrama(mensajeKafka,"central_fo");
-                    respuesta = "OK/FUGA_REGISTRADA";
-                } else if (parts[0].equalsIgnoreCase("FUGA_RESUELTA")) {
+                    respuesta = "OK/LEAK_REGISTERED";
+                } else if (parts[0].equalsIgnoreCase("LEAK_RESOLVED")) {
                     System.out.println("Ya no hay una avería en la estación " + idEstacion);
-                    String mensajeKafka = " FUGA_RESUELTA/" + idEstacion;
+                    String mensajeKafka = "LEAK_RESOLVED/" + idEstacion;
                     enviarTrama(mensajeKafka,"central_fo");
-                    respuesta = "OK/FUGA_RESUELTA_REGISTRADA";
+                    respuesta = "OK/LEAK_RESOLVED_REGISTERED";
                 }
                 else{
-                    respuesta = " STATUS/ERROR/Operacion no valida";
+                    respuesta = "STATUS/ERROR/Operacion no valida";
                 }
             }
             else {
-                respuesta = " STATUS/ERROR/Operacion no valida";
+                respuesta = "STATUS/ERROR/Operacion no valida";
             }
         }
         else{
-            respuesta = " STATUS/ERROR/Operacion no valida";
+            respuesta = "STATUS/ERROR/Operacion no valida";
         }
         return respuesta;
     }
@@ -115,15 +115,21 @@ public class ClientHandler implements Runnable{
             System.err.println("Error al realizar el run");
         }
         finally {
-            if( this. socketCliente!=null && !this. socketCliente.isClosed()){
+            if (this.socketCliente != null && !this.socketCliente.isClosed()) {
                 try {
                     this.socketCliente.close();
-                    System.out.println("Socket cerrado correctamente");
-                    this.central.eliminarmap(this.idEstacion);
-                    this.central.actualEstadoEstacion(this.idEstacion, "DISCONNECTED");
+                    System.out.println("Socket cerrado correctamente.");
                 } catch (IOException e) {
-                    System.out.println("Socket no cerrado correctamente");
+                    System.err.println("Error al cerrar el socket: " + e.getMessage());
                 }
+            }
+            //Esto es por si la estacion llego realmente a conectarese
+            if (this.idEstacion != null && !this.idEstacion.trim().isEmpty()) {
+                System.out.println("Procesando desconexión de la estación: " + this.idEstacion);
+                this.central.eliminarmap(this.idEstacion);
+                this.central.procesarDesconexionEstacion(this.idEstacion);
+            } else {
+                System.out.println("Cliente desconectado sin haberse registrado previamente.");
             }
         }
     }
