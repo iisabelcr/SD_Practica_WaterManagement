@@ -6,6 +6,7 @@ Prompts utilizados para la elaboración del proyecto:
 5. ¿Cómo se realiza la lectura de datos por consola en Java (como el scanf en C)?
 6. ¿Cómo limpiar la consola en un programa en Java?
 7. ¿Cómo hacer un Dockerfile para Java?
+8. ¿Por qué se usan los daemons en Java para los hilos?
 
 Otras fuentes de información:
 - https://www.conduktor.io/kafka/complete-kafka-producer-with-java
