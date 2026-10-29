@@ -170,10 +170,10 @@ public class WM_M {
 
     public static void main(String[] args) {
         // Si los argumentos son incorrectos:
-        if (args.length < 4) {
-            System.out.println("Debe indicar el puerto del servidor que ofrece al engine, la IP y puerto de la central y el ID de la WS");
-			System.out.println("$./WM_WS_M puerto_servidor ip_central puerto_central id_ws");
-			System.exit (1);
+        if (args.length < 5) {
+            System.out.println("Debe indicar el puerto del servidor que ofrece al engine, la IP y puerto de la central y el ID y ubicación de la WS");
+			System.out.println("$./WM_WS_M puerto_servidor ip_central puerto_central id_ws ubicacion");
+			System.exit(1);
         }
 
         // Guardamos la información:
@@ -181,6 +181,7 @@ public class WM_M {
         String ipCentral = args[1];
         String puertoCentral = args[2];
         String idWS = args[3];
+        String ubicacion = args[4];
 
         // ---------------------------------
         // CONEXIÓN Y REGISTRO CON CENTRAL:
@@ -193,14 +194,18 @@ public class WM_M {
             socketCentral = new Socket(ipCentral, Integer.parseInt(puertoCentral));
 
             // Se crea la trama que se enviará a Central para el registro de la estación. Formato: "REGISTRO/idWs"
-            String datos = "REGISTRO/" + idWS;
+            String datos = "REGISTER/" + idWS + ubicacion;
             escribirSocket(socketCentral, datos);
 
             // Se lee la respuesta por parte de Central:
             String respuesta = leerSocket(socketCentral);
-            // AQUÍ SE PROCESA LA RESPUESTA
+            if (respuesta.startsWith("OK")) {
+                System.out.println("Se ha registrado correctamente la WS en Central");
+            } else {
+                System.out.println("Ha fallado el registro de la WS en Central");
+                System.exit(1);
+            }
 
-            socketCentral.close(); // Se cierra el socket
         } catch (Exception e) {
             System.out.println("Ha fallado la conexión con Central");
             System.out.println("Error: " + e.getMessage());
