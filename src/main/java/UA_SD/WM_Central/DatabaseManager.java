@@ -52,7 +52,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error inicializando BD: " + e.getMessage());
         }
     }
-    public static void insertarOperarios(Operario myoperario){
+    public static synchronized void insertarOperarios(Operario myoperario){
         String sql="INSERT INTO operarios (id,nombre) VALUES (?,?)";
         try(Connection conn = connect();
             PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -64,7 +64,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al insertar en la base de datos BD: " + e.getMessage());
         }
     }
-    public static void insertarEstacion(Estacion myestacion){
+    public static synchronized void insertarEstacion(Estacion myestacion){
         //Esto es para insertar dentro de los atributos de una estacion sus valores
         String sql="INSERT INTO estaciones (id,ubicacion,estado,caudalact,volumenacum,operarioId) VALUES (?,?,?,?,?,?)";
         //Intentamos ver si funciona la conexion
@@ -84,7 +84,7 @@ public class DatabaseManager {
         }
     }
     //Esta no se pa que muy bien la quiero
-    public static List<Operario> leerTodasOperario(){
+    public static synchronized List<Operario> leerTodasOperario(){
         List<Operario> lista = new ArrayList<>();
         String sql="SELECT id,nombre FROM operarios";
         try( //1. Abre el canal de comunicación con el archivo SQLite.
@@ -105,7 +105,7 @@ public class DatabaseManager {
         }
         return lista;
     }
-    public static List<Estacion> leerTodasEstaciones(){
+    public static synchronized List<Estacion> leerTodasEstaciones(){
         List<Estacion> lista = new ArrayList<>();
         String sql="SELECT id,ubicacion,estado,caudalact,volumenacum FROM estaciones";
         try( //1. Abre el canal de comunicación con el archivo SQLite.
@@ -133,7 +133,7 @@ public class DatabaseManager {
         }
         return lista;
     }
-    public static void borrarOperario(Operario myoperario){
+    public static synchronized void borrarOperario(Operario myoperario){
         String sql="DELETE FROM operario where id=?";
         try(
             Connection conn = connect();
@@ -144,7 +144,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al borrar: " + e.getMessage());
         }
     }
-    public static void borrarEstacion(Estacion myestacion){
+    public static synchronized void borrarEstacion(Estacion myestacion){
         String sql="DELETE FROM estaciones where id=?";
         try(
             Connection conn = connect();
@@ -155,7 +155,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al borrar: " + e.getMessage());
         }
     }
-    public static void actualizarOperario(Operario myoperario){
+    public static synchronized void actualizarOperario(Operario myoperario){
         String sql ="UPDATE operarios set nombre = ? where id = ?";
         try(Connection conn = connect();
         PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -166,7 +166,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al actualizar la base de datos: " + e.getMessage());
         }
     }
-    public static void actualizarEstacion(Estacion myestacion){
+    public static synchronized void actualizarEstacion(Estacion myestacion){
         String sql="UPDATE estaciones set ubicacion = ?, estado = ?,caudalact = ?,volumenacum = ?,operarioId = ? WHERE id = ?";
         try(Connection conn= connect();
             PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -183,7 +183,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al actualizar la base de datos: " + e.getMessage());
         }
     }
-    public static Operario obtenerOperario(String id){
+    public static synchronized Operario obtenerOperario(String id){
         String sql="SELECT id,nombre FROM operarios where id = ?";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -201,7 +201,7 @@ public class DatabaseManager {
         }
         return null;
     }
-    public static Estacion obtenerEstacion(String id){
+    public static synchronized Estacion obtenerEstacion(String id){
         String sql="SELECT id,ubicacion,estado,caudalact,volumenacum,operarioId FROM estaciones where id = ?";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -223,5 +223,8 @@ public class DatabaseManager {
         }
         return null;
     }
-
+    //Se les ha añadido la palabras synchronized a cada uno de estos metodos crud porque si dos hilos
+    //quieren acceder a la base de datos ,y uno de los hilos lllega un momento mas tarde que el otro se vera
+    //que esta bloqueado la base de datos y entonces se lanzara una excepcion y es por eso que se pone
+    //que esten sincronizados
 }

@@ -46,29 +46,13 @@ public class WM_Central {
         return estaciones;
     }
 
-    public void anadirestacion(Estacion estacion){
-        if(estacion!=null) {
-            this.estaciones.add(estacion);
-            DatabaseManager.insertarEstacion(estacion);
-        }
-    }
+
     public void setOperarios(List<Operario> operarios) {
         if (operarios != null) {
             this.operarios = operarios;
         }
     }
-    public boolean actualEstadoEstacion(String id,String nueEstado){
-        boolean aux=false;
-        for(int i=0;i<estaciones.size() && !aux ;i++){
-            if(estaciones.get(i).getId().equalsIgnoreCase(id)){
-                Estacion est = estaciones.get(i);
-                est.setEstado(nueEstado);
-                DatabaseManager.actualizarEstacion(est);
-                aux=true;
-            }
-        }
-        return aux;
-    }
+
     public void setestaciones(List<Estacion> estaciones) {
         if (estaciones != null) {
             this.estaciones = estaciones;
@@ -127,7 +111,7 @@ public class WM_Central {
                                     est.setCaudalactual(0.0);
                                     String idOperarioAnt=est.getOperarioId();
                                     est.setOperarioId(null);
-                                    DatabaseManager.actualizarEstacion(est);
+                                    actualizarEstacionEnSistema(est);
                                     String mensajeKafkaEngine = "BLOQUEAR/" + idEstacion;
                                     WM_Central.this.enviarmensajekafka(mensajeKafkaEngine, "central_engine");
                                     if(aux && idOperarioAnt!=null && !idOperarioAnt.equalsIgnoreCase("CENTRAL")){
@@ -152,7 +136,7 @@ public class WM_Central {
                                     est.setEstado("AVAILABLE");
                                     est.setCaudalactual(0.0);
                                     est.setOperarioId(null);
-                                    DatabaseManager.actualizarEstacion(est);
+                                    actualizarEstacionEnSistema(est);
                                     String mensajeKafkaEngine = "ACTIVAR/" + idEstacion;
                                     WM_Central.this.enviarmensajekafka(mensajeKafkaEngine, "central_engine");
                                     encontrar=true;
@@ -166,10 +150,12 @@ public class WM_Central {
                     }
                     else if(opcion.equalsIgnoreCase("4")){
                         System.out.println("\n---------------------------------------------------------------------------------------------------");
+                        System.out.println("\n---------------------------------------------------------------------------------------------------");
                         System.out.printf("%-10s | %-20s | %-25s | %-10s | %-10s | %-10s%n", "ID", "UBICACIÓN", "ESTADO", "CAUDAL", "VOLUMEN", "OPERARIO");
                         System.out.println("---------------------------------------------------------------------------------------------------");
+                        System.out.println("\n---------------------------------------------------------------------------------------------------");
 
-                        List<Estacion> lista = DatabaseManager.leerTodasEstaciones();
+                        List<Estacion> lista = WM_Central.this.getaestaciones();
                         for (Estacion est : lista) {
                             String estadoColoreado = est.getEstado();
 
@@ -210,6 +196,9 @@ public class WM_Central {
             }
         });
         hiloConsoleMenu.start();
+    }
+    public KafkaProducer<String, String> getProducer() {
+        return producer;
     }
     public static void main(String[] args){
         String puerto;
@@ -301,67 +290,73 @@ public class WM_Central {
 
                 KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
                 consumer.subscribe(Collections.singletonList(topic));
-                while(true){
-                    try {
-                        while (true) {
+                try {
+                    while (!Thread.currentThread().isInterrupted()) {
+                        try {
                             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
                             for (ConsumerRecord<String, String> record : records) {
                                 String textoCompleto = record.value();
                                 String[] trama = textoCompleto.split("/");
-                                if(trama.length>=2) {
+                                if (trama.length >= 2) {
                                     String mensaje = trama[0];
                                     String idEstacion = trama[1];
-                                    Estacion est = DatabaseManager.obtenerEstacion(idEstacion);
-                                    String idOperario = (est != null) ? est.getOperarioId() : null;
+                                    Estacion est = buscarEstacionMemoria(idEstacion);
+                                    String idOperario =null;
+                                    if(est!=null){
+                                        idOperario=est.getOperarioId();
+                                    }
 
-                                    if (trama[0].equalsIgnoreCase("RESPUESTA_RIEGO") && trama.length >= 3) {
+                                    if (trama[0].equalsIgnoreCase("WATERING_RESPONSE") && trama.length >= 3) {
                                         String estado = trama[2];
                                         if (estado.equalsIgnoreCase("OK")) {
                                             System.out.println("Riego iniciado con éxito en la estación " + idEstacion);
-                                            String mensajeKafka = "RESPUESTA_RIEGO/" + idEstacion + "/OK";
+                                            String mensajeKafka = "WATERING_RESPONSE/" + idEstacion + "/OK";
                                             enviarmensajekafka(mensajeKafka, "central_fo", idOperario);
                                         } else {
-                                            String mensajeKafka = "RESPUESTA_RIEGO/" + idEstacion + "/NOK";
+                                            String mensajeKafka = "WATERING_RESPONSE/" + idEstacion + "/NOK";
                                             enviarmensajekafka(mensajeKafka, "central_fo", idOperario);
                                         }
-                                    } else if (trama[0].equalsIgnoreCase("DATOS_RIEGO") && trama.length >= 4) {
+                                    }
+                                    else if (trama[0].equalsIgnoreCase("WATERING_DATA") && trama.length >= 4) {
                                         double caudal = Double.parseDouble(trama[2].replace(',', '.'));
                                         double volumen = Double.parseDouble(trama[3].replace(',', '.'));
                                         System.out.println("Mira funciona bien los datos de riego mira esto " + idEstacion + caudal + volumen);
-                                        String mensajeKafka = "DATOS_RIEGO/" + idEstacion + "/" + caudal + "/" + volumen;
+                                        String mensajeKafka = "WATERING_DATA/" + idEstacion + "/" + caudal + "/" + volumen;
                                         enviarmensajekafka(mensajeKafka, "central_fo", idOperario);
-                                    } else if (trama[0].equalsIgnoreCase("FIN_RIEGO") && trama.length >= 4) {
+                                    }
+                                    else if (trama[0].equalsIgnoreCase("WATERING_END") && trama.length >= 4) {
                                         double tiempo = Double.parseDouble(trama[2].replace(',', '.'));
                                         double volumen = Double.parseDouble(trama[3].replace(',', '.'));
                                         System.out.println("OOOOOOOOOOO SE HA FINALIZADO" + idEstacion + tiempo + volumen);
-                                        boolean encontrar=false;
-                                        for (int i=0;i<WM_Central.this.estaciones.size() && !encontrar;i++) {
-                                            if (WM_Central.this.estaciones.get(i).getId().equalsIgnoreCase(idEstacion)) {
-                                                WM_Central.this.estaciones.get(i).setEstado("AVAILABLE");
-                                                WM_Central.this.estaciones.get(i).setOperarioId(null);
-                                                WM_Central.this.estaciones.get(i).setCaudalactual(0.0);
-                                                DatabaseManager.actualizarEstacion(WM_Central.this.estaciones.get(i));
-                                                encontrar=true;
-                                            }
+                                        boolean encontrar = false;
+                                        Estacion estMemoria = buscarEstacionMemoria(idEstacion);
+                                        if (estMemoria != null) {
+                                            estMemoria.setEstado("AVAILABLE");
+                                            estMemoria.setOperarioId(null);
+                                            estMemoria.setCaudalactual(0.0);
+                                            actualizarEstacionEnSistema(estMemoria);
                                         }
-                                        WM_Central.this.actualEstadoEstacion(idEstacion, "AVAILABLE");
 
-                                        String mensajeKafka = "FIN_RIEGO/" + idEstacion + "/" + tiempo + "/" + volumen;
+                                        String mensajeKafka = "WATERING_END/" + idEstacion + "/" + tiempo + "/" + volumen;
                                         enviarmensajekafka(mensajeKafka, "central_fo", idOperario);
-                                    }
-                                    else {
+                                    } else {
                                         System.out.println("STATUS/ERROR/Operacion no valida");
                                     }
-                                }
-                                else{
+                                } else {
                                     System.out.println("Fallo de numero de slipts en la trama");
                                 }
                             }
+                        } catch (Exception e) {
+                            System.err.println("[KAFKA ERROR] Error procesando registros: " + e.getMessage());
+                        }
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
                         }
                     }
-                    catch (Exception e) {
-                        System.err.println("Error en el poll " + e.getMessage());
-                    }
+                } catch (Exception e) {
+                    System.err.println("Error en el poll " + e.getMessage());
                 }
             }
         });
@@ -404,7 +399,7 @@ public class WM_Central {
                                         if (llimpia) {
                                             ClientHandler handler = WM_Central.this.getMapeoestaciones().get(idEstacion);
                                             if (handler != null) {
-                                                String mensaje = "SOLICITUD_RIEGO/" + idOperario + "/" + idEstacion + "/" + segundos;
+                                                String mensaje = "WATERING_REQUEST/" + idOperario + "/" + idEstacion + "/" + segundos;
                                                 handler.enviarTrama(mensaje, "central_engine");
                                             } else {
                                                 System.out.println("La estación no está conectada por Socket");
@@ -413,7 +408,7 @@ public class WM_Central {
                                     }
                                     // CASO 02: Petición de Listado de Estaciones Disponibles
                                     else if (codOperacion.equalsIgnoreCase("02")) {
-                                        String listaEst = "LISTA_ESTACIONES";
+                                        String listaEst = "STATIONS_LIST";
                                         for (int i = 0; i < WM_Central.this.getaestaciones().size(); i++) {
                                             if (WM_Central.this.getaestaciones().get(i).getEstado().equalsIgnoreCase("AVAILABLE")) {
                                                 listaEst += "/" + WM_Central.this.getaestaciones().get(i).getId() + ":" + WM_Central.this.getaestaciones().get(i).getUbicacion();
@@ -446,10 +441,10 @@ public class WM_Central {
         boolean aux=false;
         for(int i=0;i<this.estaciones.size() && !aux;i++){
             if(idEstacion.equalsIgnoreCase(estaciones.get(i).getId())){
-                if(!(estaciones.get(i).getEstado().equalsIgnoreCase("AVERIA")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("FUGA")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("OUT_OF_SERVICE"))){
+                if(!(estaciones.get(i).getEstado().equalsIgnoreCase("LEAK")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("OUT_OF_SERVICE"))){
                     Estacion est = estaciones.get(i);
                     est.setOperarioId(idOperario);
-                    DatabaseManager.actualizarEstacion(est);
+                    actualizarEstacionEnSistema(est);
                     aux=true;
                 }
                 else{
@@ -467,10 +462,10 @@ public class WM_Central {
         boolean aux=false;
         for(int i=0;i<this.estaciones.size() && !aux;i++){
             if(idEstacion.equalsIgnoreCase(estaciones.get(i).getId())){
-                if(!(estaciones.get(i).getEstado().equalsIgnoreCase("LEAK")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("DISCONNECTED")) && !(estaciones.get(i).getEstado().equalsIgnoreCase("OUT_OF_SERVICE"))){
+                if(estaciones.get(i).getEstado().equalsIgnoreCase("AVAILABLE")){
                     estaciones.get(i).setEstado("WATERING");
                     estaciones.get(i).setOperarioId("CENTRAL");
-                    DatabaseManager.actualizarEstacion(estaciones.get(i));
+                    actualizarEstacionEnSistema(estaciones.get(i));
                     aux=true;
                 }
             }
@@ -478,7 +473,69 @@ public class WM_Central {
         return aux;
     }
 
-    public KafkaProducer<String, String> getProducer() {
-        return producer;
+    public synchronized void procesarDesconexionEstacion(String idEstacion) {
+        if(idEstacion!=null){
+            Estacion est = buscarEstacionMemoria(idEstacion);
+            if (est != null) {
+                String estadoAnt = est.getEstado();
+                String idOperarioAnt = est.getOperarioId();
+
+                est.setEstado("DISCONNECTED");
+                est.setCaudalactual(0.0);
+                est.setOperarioId(null);
+
+                actualizarEstacionEnSistema(est);
+                // Hay que avisar al operario de que se desconecta la estacoion que estaba en ese momento regando
+                if ("WATERING".equalsIgnoreCase(estadoAnt) && idOperarioAnt != null) {
+                    System.out.println("La estacion con el " + idEstacion + " se ha desconectado durante un riego activo.");
+
+                    // Enviar aviso de fin/interrupción de riego al operario asignado vía Kafka
+                    if (!idOperarioAnt.equalsIgnoreCase("CENTRAL")) {
+                        String mensajeKafkaFO = "WATERING_END/" + idEstacion + "/0/0";
+                        enviarmensajekafka(mensajeKafkaFO, "central_fo", idOperarioAnt);
+                    }
+                }
+            }
+        }
     }
+
+    /**
+     buscarEstacionMemoria permite consultar los datos en tiempo real desde la lista this.estaciones(yo puse getesatciones)
+     sin perder rendimiento abriendo SQLite ni leer datos antiguos que pueden estar desfasados, mientras que actualizarEstacionEnSistema
+     decide si debe hacer un INSERT o un UPDATE en SQLite, garantizan mediante synchronized que la lista en memoria
+     y la base de datos se mantengan 100% idénticas y que esten protegidas frente a fallos cuando varios hilos ejecuten cambios a la vez.
+     Al principio yo ponia guardar directamente desde la base de datos
+     y no hacia el set o a veces solo hacia el set pero se me olvidaba a guardar en la base de datos ,y bueno como habia hecho dos diferentes
+     tipos de crud uno para insertar nuevas estaciones y luego otro para actualizar estaciones pues solo actualizaba y no insertaba ,y era poco eficiente
+     y es por ello por lo que después de revisar y darme cuenta de ciertos errores pues decidi hacer dos funciones a parte y estan separas porque no siempre
+     se busca y se actualiza.
+     */
+    public Estacion buscarEstacionMemoria(String id) {
+        Estacion est=null;
+        if (id != null) {
+            for (int i=0;i<getaestaciones().size();i++) {
+                if (getaestaciones().get(i).getId().equalsIgnoreCase(id)) {
+                    est=getaestaciones().get(i);
+                }
+            }
+        }
+        return est;
+    }
+
+    public synchronized boolean actualizarEstacionEnSistema(Estacion est) {
+        boolean aux=false;
+        if (est != null) {
+            Estacion existente = buscarEstacionMemoria(est.getId());
+            if (existente == null) {
+                this.estaciones.add(est);
+                DatabaseManager.insertarEstacion(est);
+            } else {
+                DatabaseManager.actualizarEstacion(est);
+            }
+             aux=true;
+        }
+        return aux;
+    }
+
 }
+
