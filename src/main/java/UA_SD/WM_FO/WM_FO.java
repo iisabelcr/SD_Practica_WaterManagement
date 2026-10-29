@@ -11,7 +11,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.WakeupException;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -26,9 +25,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.CountDownLatch;
 
 public class WM_FO {
     private static final String TOPIC_PRODUCTOR = "fo_central";
@@ -148,6 +144,17 @@ public class WM_FO {
 
 
     /**
+     * Genera una pausa antes de volver al menú tras la ejecución de cualquier opción.
+     * @param scanner
+     */
+    private static void pausar(Scanner scanner) {
+        System.out.println("\nPulsa Enter para volver al menú...");
+        scanner.nextLine();
+    }
+
+
+
+    /**
      * Procedimiento que muestra mensajes de iniciación del programa.
      * @param ipBroker
      * @param puertoBroker
@@ -218,6 +225,7 @@ public class WM_FO {
 
         // Se establecen las propiedades:
         Properties props = new Properties();
+        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 5000); // Para agilizar el envío de los metadatos
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -310,7 +318,7 @@ public class WM_FO {
             productor.send(new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, mensaje)).get(5, TimeUnit.SECONDS);
 
         } catch (Exception e) {
-            System.err.println("Central no ha respondido a la solicitud");
+            System.err.println("No se ha podido enviar la solicitud al broker");
             return;
         }
 
@@ -353,7 +361,7 @@ public class WM_FO {
                 }
 
                 System.out.println("Leyendo solicitud de servicio: " + linea);
-                solicitarRiego(productor, hilo, idOperador, info[0], Integer.parseInt(info[1]));
+                solicitarRiego(productor, hilo, idOperador, info[0].trim(), Integer.parseInt(info[1]));
                 Thread.sleep(4000); // Se espera 4 segundos antes de leer la siguiente petición 
             }
 
@@ -362,6 +370,7 @@ public class WM_FO {
 
         } catch (InterruptedException e) {
             System.err.println("Error durante la espera: " + e.getMessage());
+
         }
     }
 
@@ -544,12 +553,20 @@ public class WM_FO {
         hilo.start();
 
         // Comienza la cuenta atrás para establecer la comunicación del consumidor. De esta forma, los FO no enviarán ninguna petición antes de que el consumidor esté listo
+        // Si no se ha podido conectar con el broker, se saldrá del programa
+        boolean conectado = false;
         try {
-            if (!hilo.getListo().await(15, java.util.concurrent.TimeUnit.SECONDS)) {
-                System.out.println("No se pudo conectar con el broker.");
-            }
+            conectado = hilo.getListo().await(15, TimeUnit.SECONDS);
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+
+        if (!conectado) {
+            System.out.println("No se ha podido conectar con el broker.");
+            hilo.detener();
+            productor.close(Duration.ofSeconds(1));
+            System.exit(1);
         }
 
         clear();
@@ -557,6 +574,12 @@ public class WM_FO {
 
         boolean salir = false;
         while (!salir) {
+            // Comprobamos que el hiloConsumidor sigue vivo para que no fallen las comunicaciones ni salten timeouts
+            if (!hilo.isAlive()) {
+                System.out.println("Ha finalizado la conexión con el broker inesperadamente");
+                System.exit(1);
+            }
+
             clear();
             int opcion = mostrarMenu(scanner); // Se muestra el menú y se guarda la opción escogida
 
@@ -567,12 +590,15 @@ public class WM_FO {
                     } else {
                         ficheroSolicitudes(productor, hilo, idOperador, servicios);
                     }
+                    pausar(scanner);
                     break;
                 case 2:
                     crearSolicitud(scanner, productor, hilo, idOperador);
+                    pausar(scanner);
                     break;
                 case 3:
                     mostrarEstaciones(productor, hilo, idOperador);
+                    pausar(scanner);
                     break;
                 case 4:
                     salir = true;
@@ -583,14 +609,13 @@ public class WM_FO {
         // Se cierran todas las conexiones y el scanner:
         productor.flush();
         productor.close();
+
         hilo.detener(); // El consumidor ya se cierra en el hilo.
+        try {
+            hilo.join(2000); // Se espera 2 segundes a que termine la detención del hilo. De esta forma, el programa se asegurará de que el consumidor termina antes de que finalice el programa (porque el hilo es un daemon)
+        } catch (InterruptedException e) {
+            System.out.println("Error al finalizar el hilo consumidor: " + e.getMessage());
+        }
         scanner.close();
     }
 }
-
-// COSAS QUE FALTA POR IMPLEMENTAR:
-// 1. En crearSolicitud, falta incluir el listado de las estaciones de riego disponibles (195)
-// 2. Comprobar la validez de la estación marcada en la misma función (199)
-// 3. En mostrarEstaciones, falta procesar e imprimir por pantalla las estaciones (263)
-// 4. Mostrar el estado de las estaciones de riego activadas
-// 5. Hacer el main bien bien, es decir, hacer que funcione
