@@ -2,23 +2,37 @@ package UA_SD.WM_WS;
 
 import java.io.*;
 import java.net.*;
+
+import UA_SD.WM_WS.WM_M.HiloServidorEngine;
 public class WM_M {
+    // Atributos de la WS (compartidos por todos los hilos):
+    private static String idWS;
+    private static String ubicacion;
+    private static String ipCentral;
+    private static int puertoCentral;
+    private static volatile boolean averia = false;
+
+    // Variables para la conexión con Central:
+    private static Socket socketCentral;
+    private static BufferedReader entradaCentral;
+    private static PrintWriter salidaCentral;
+    private static volatile boolean centralConectada = false;
+
+    //Tramas para la comuncicación a través de los sockets:
+    private static String tramaRegistro()     { return "REGISTER/" + idWS + "/" + ubicacion; }
+    private static String tramaAveria()       { return "LEAK/" + idWS; }
+    private static String tramaRecuperacion() { return "LEAK_RESOLVED/" + idWS; }
+    private static String tramaEstado()       { return "STATUS/" + idWS; }
+
     /**
      * Clase interna que permite la comunicación entre el Monitor y el Engine de la WS de forma asíncrona
      * HiloServidorEngine
      */
     static class HiloServidorEngine extends Thread {
         private int puertoServidor;
-        private String ipCentral;
-        private int puertoCentral;
-        private String idWS;
-        private volatile boolean averia = false;
 
-        public HiloServidorEngine(int puerto, String ipCentral, int puertoCentral, String idWS) {
+        public HiloServidorEngine(int puerto) {
             this.puertoServidor = puerto;
-            this.ipCentral = ipCentral;
-            this.puertoCentral = puertoCentral;
-            this.idWS = idWS;
         }
 
         public void run() {
@@ -31,11 +45,19 @@ public class WM_M {
                         System.out.println("Conexión establecida con el Engine");
                         
                         comprobarSalud(socketEngine); // Iniciamos la comprobación periódica del estado de salud
+                        
+                        // Se cierra el socket (y se procesa la excepción, en caso de que la haya)
+                        try {
+                            socketEngine.close();
+                        } catch (IOException e) { }
+
+                        System.out.println("Engine desconectado. Restableciendo conexión...");
                     }
             
             } catch (Exception e) {
                 System.out.println("Fallo crítico en el Servidor del Monitor");
                 System.out.println("Error: " + e.getMessage());
+                System.exit(1);
             }
         }
 
@@ -47,22 +69,24 @@ public class WM_M {
             averia = nuevaAveria;
 
             if (nuevaAveria) {
-                notificarCentral("AVERIA/" + idWS);
+                notificarCentral(tramaAveria());
                 System.out.println("Se ha producido una avería en la WS. Esperando recuperación...");
 
             } else {
-                notificarCentral("RECUPERACION/" + idWS);
+                notificarCentral(tramaRecuperacion());
                 System.out.println("La WS se ha recuperado de la avería");
             }
         }
 
         private void comprobarSalud(Socket socketEngine) {
             try {
+                socketEngine.setSoTimeout(2000); // Espera un máximo de dos segundos (aunque el Engine va a mandarle los mensajes cada segundo)
+                int timeouts = 0; // Ayuda a que no se alerte de una avería al producirse un atraso anormal del mensaje de comprobación. Cuando valga más de uno, se notificará la avería
+
                 // Manda información al Engine infinitamente:
                 while (true) {
-                    escribirSocket(socketEngine, "STATUS"); // Manda un mensaje de comprobación de estado de salud
+                    escribirSocket(socketEngine, tramaEstado()); // Manda un mensaje de comprobación de estado de salud
                     String respuesta = leerSocket(socketEngine);
-                    socketEngine.setSoTimeout(3000); // Espera un máximo de tres segundos (aunque el Engine va a mandarle los mensajes cada segundo)
                     
                     // Si el Engine no responde, se sale del bucle para volver a conectarse con él
                     if (respuesta == null) {
@@ -73,35 +97,40 @@ public class WM_M {
                     // El mensaje de la comprobación de salud puede ser 'OK' o 'KO'
                     switch (respuesta) {
                         case "OK":
+                            timeouts = 0;
                             actualizarAveria(false);
                             break;
 
                         case "KO":
+                            timeouts = 0;
                             actualizarAveria(true);
+                            break;
+
+                        case "TIMEOUT": // En caso de que no responda pero la conexión siga abierta
+                            timeouts++;
+                            if (timeouts >= 2) { // No se tolera más de 1 timeout
+                                actualizarAveria(true);
+                            }
                             break;
 
                         default:
                             System.err.println("Respuesta de salud desconocida: " + respuesta);
                             break;
                     }
+
+                    Thread.sleep(1000); // Se comprueba cada segundo
                 }
 
             } catch (Exception e) {
                 System.out.println("Se ha perdido la conexión con el Engine. Reconectando...");
                 System.out.println("Error: " + e.getMessage());
+                actualizarAveria(true);
 
             }
         }
 
         private void notificarCentral(String mensaje) {
-            try {
-                Socket socketCentral = new Socket(ipCentral, puertoCentral);
-                escribirSocket(socketCentral, mensaje);
 
-            } catch (Exception e) {
-                System.out.println("Fallo al intentar notificar el estado a Central");
-                System.out.println("Error: " + e.getMessage());
-            }
         }
     }
 
