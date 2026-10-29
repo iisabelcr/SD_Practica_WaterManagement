@@ -2,8 +2,6 @@ package UA_SD.WM_WS;
 
 import java.io.*;
 import java.net.*;
-
-import UA_SD.WM_WS.WM_M.HiloServidorEngine;
 public class WM_M {
     // Atributos de la WS (compartidos por todos los hilos):
     private static String idWS;
@@ -130,8 +128,137 @@ public class WM_M {
         }
 
         private void notificarCentral(String mensaje) {
-
+            if (!enviarCentral(mensaje)) {
+                System.out.println("Sin conexión con Central: el estado se sincronizará al reconectar");
+            }
         }
+    }
+
+
+
+    /**
+     * Clase interna que permite la comunicación entre el Monitor y Central.
+     * HiloCentral
+     */
+    static class HiloCentral extends Thread {
+        @Override
+        public void run() {
+            while (true) {
+                if (conectarCentral()) {
+                    if (averia) {
+                        enviarCentral(tramaAveria()); // Si hay avería, hay que notificar a Central
+                    }
+
+                    escucharCentral(); // Mientras Central siga conectada, el hilo se quedará parado en esta función
+                    desconectarCentral();
+                    System.out.println("Se ha perdido la conexión con Central");
+                }
+
+                System.out.println("Restableciendo conexión con Central en 5 segundos...");
+                try {
+                    Thread.sleep(5000);
+
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+    }
+
+
+
+    /**
+     * Función que permite la conexión con el socket de Central
+     * @return booleano que indica el éxito de la conexión
+     */
+    private static boolean conectarCentral() {
+        try {
+            Socket socket = new Socket();
+            socket.connect(new InetSocketAddress(ipCentral, puertoCentral), 5000);
+
+            // Se crean los canales y se guardan. De esta forma es más fácil enviar y leer mensajes
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+
+            out.println(tramaRegistro());
+
+            socket.setSoTimeout(5000); // Tiempo máximo para la respuesta del registro
+            String respuesta = in.readLine();
+            socket.setSoTimeout(0); // Después, espera sin límite
+
+            if (respuesta == null || !respuesta.trim().startsWith("OK")) {
+                System.err.println("Central no ha aceptado el registro de la WS: " + respuesta);
+                System.exit(1); // Sin registrarse, se aborta el programa
+            }
+
+            synchronized (WM_M.class) {
+                socketCentral = socket;
+                entradaCentral = in;
+                salidaCentral = out;
+                centralConectada = true;
+            }
+
+            System.out.println("WS registrada en Central (" + respuesta.trim() + ")");
+            
+            return true;
+
+        } catch (Exception e) {
+            System.out.println("No se ha podido conectar con Central");
+            System.out.println("Error: " + e.getMessage());
+
+            return false;
+        }
+    }
+
+
+
+    /**
+     * Envía a Central la trama pasada por parámetro,
+     * @param trama
+     * @return booleano que determina si se ha enviado la trama con éxito o no
+     */
+    private static synchronized boolean enviarCentral(String trama) {
+        if (!centralConectada || salidaCentral == null) {
+            return false;
+        }
+
+        salidaCentral.println(trama);
+        if (salidaCentral.checkError()) { // En caso de error, se desconecta la conexión con Central
+            desconectarCentral();
+
+            return false;
+        }
+
+        return true;
+    }
+
+
+
+    /**
+     * Escucha el socket de central para recibir los mensajes
+     */
+    private static void escucharCentral() {
+        try {
+            String linea;
+            while ((linea = entradaCentral.readLine()) != null) {
+                if (!linea.trim().startsWith("OK")) {
+                    System.out.println("[Central] " + linea.trim());
+                }
+            }
+        } catch (IOException e) {} // Si lanza una excepción, deja de escuchar
+    }
+
+
+
+    /**
+     * Descanecta la conexión con Central
+     */
+    private static synchronized void desconectarCentral() {
+        centralConectada = false;
+        salidaCentral = null;
+        try {
+            if (socketCentral != null) socketCentral.close();
+        } catch (IOException e) {}
     }
 
 
@@ -148,9 +275,6 @@ public class WM_M {
 
     /**
      * Procedimiento que muestra mensajes de iniciación del programa.
-     * @param ipBroker
-     * @param puertoBroker
-     * @param idOperador
      */
     private static void iniciarMonitor() {
         try {
@@ -169,7 +293,6 @@ public class WM_M {
     /**
      * Función que lee la información procedente del socket.
      * @param socket
-     * @param datos
      * @return datos
      */
     private static String leerSocket(Socket socket) {
@@ -177,6 +300,9 @@ public class WM_M {
 			InputStream aux = socket.getInputStream();
 			DataInputStream flujo = new DataInputStream(aux);
 			return flujo.readUTF();
+        
+        } catch (SocketTimeoutException e) {
+            return "TIMEOUT";
 
 		} catch (Exception e) {
 			System.out.println("Ha fallado la conexión con Central");
@@ -199,7 +325,7 @@ public class WM_M {
 			flujo.writeUTF(datos);
 
 		} catch (Exception e) {
-			System.out.println("Ha fallado la conexión con Central");
+			System.out.println("Ha fallado la conexión con el Engine");
             System.out.println("Error: " + e.getMessage());
 		}
 	}
@@ -215,50 +341,21 @@ public class WM_M {
         }
 
         // Guardamos la información:
-        String puertoServidor = args[0];
-        String ipCentral = args[1];
-        String puertoCentral = args[2];
-        String idWS = args[3];
-        String ubicacion = args[4];
+        int puertoServidor = Integer.parseInt(args[0]);
+        ipCentral = args[1];
+        puertoCentral = Integer.parseInt(args[2]);
+        idWS = args[3];
+        ubicacion = args[4];
 
-        // ---------------------------------
-        // CONEXIÓN Y REGISTRO CON CENTRAL:
-        // ---------------------------------
-        Socket socketCentral = new Socket();
-        try {
-            // Se muestran los mensajes de inicio del Monitor
-            iniciarMonitor();
+        iniciarMonitor();
 
-            socketCentral = new Socket(ipCentral, Integer.parseInt(puertoCentral));
+        // Conexión con Central:
+        HiloCentral hiloCentral = new HiloCentral();
+        hiloCentral.start();
 
-            // Se crea la trama que se enviará a Central para el registro de la estación. Formato: "REGISTRO/idWs"
-            String datos = "REGISTER/" + idWS + "/" + ubicacion;
-            escribirSocket(socketCentral, datos);
-
-            // Se lee la respuesta por parte de Central:
-            String respuesta = leerSocket(socketCentral);
-
-            if (respuesta == null || !respuesta.startsWith("OK")) {
-                System.err.println("Central no ha aceptado el registro de la WS");
-                System.exit(1); // Si no se produce el registro, se finaliza el programa
-            }
-
-            socketCentral.close();
-        } catch (Exception e) {
-            System.out.println("Ha fallado la conexión con Central");
-            System.out.println("Error: " + e.getMessage());
-        }
-
-        // ------------------------
-        // CONEXIÓN CON EL ENGINE:
-        // ------------------------
-        // Creamos el hilo servidor entre el Monitor y el Engine y lo activamos:
-        HiloServidorEngine servidor = new HiloServidorEngine(Integer.parseInt(puertoServidor), ipCentral, Integer.parseInt(puertoCentral), idWS);
-        servidor.start();
+        // Conexión con el Engine:
+        HiloServidorEngine hiloEngine = new HiloServidorEngine(puertoServidor);
+        hiloEngine.start();
     }
 }
 
-
-// COSAS QUE HACER:
-// Leer la respuesta de registro por parte de central
-// Quiero hacer que los mensajes de los sockets se preparen en funciones, para poder cambiarlos más fácilmente
