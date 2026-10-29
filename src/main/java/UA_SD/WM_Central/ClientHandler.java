@@ -53,26 +53,26 @@ public class ClientHandler implements Runnable{
             String[] parts =trama.split("/");
             if (parts.length>=1){
                 if(parts[0].equalsIgnoreCase("REGISTER") && parts.length>=3){
-                    Estacion estacionmdb= DatabaseManager.obtenerEstacion(parts[1]);
-                    //Se comprueba si estaba antes en la base de datos
-                    if(estacionmdb==null){
-                        Estacion nueva =new Estacion(parts[1],parts[2]);
-                        this.central.anadirestacion(nueva);
-                        respuesta="OK/STATION_REGISTERED";
-                        this.idEstacion=parts[1];
-                        this.central.agregarmap(parts[1],this);
-                    }
-                    else{
-                        this.central.actualEstadoEstacion(parts[1],parts[2]);
-                        respuesta="OK/STATUS_UPDATED";
+                    Estacion estacionMemoria = this.central.buscarEstacionMemoria(parts[1]);
+                    if (estacionMemoria == null) {
+                        Estacion nueva = new Estacion(parts[1], parts[2]);
+                        this.central.actualizarEstacionEnSistema(nueva);
+                        respuesta = "OK/STATION_REGISTERED";
+                        this.idEstacion = parts[1];
+                        this.central.agregarmap(parts[1], this);
+                    } else {
+                        estacionMemoria.setEstado(parts[2]);
+                        this.central.actualizarEstacionEnSistema(estacionMemoria);
+                        respuesta = "OK/STATUS_UPDATED";
                     }
                 }
-                else if(parts[0].equalsIgnoreCase("UPDATE_STATUS") && parts.length>=3){
-                    boolean aux=this.central.actualEstadoEstacion(parts[1],parts[2]);
-                    if(aux){
-                        respuesta="OK/STATUS_UPDATED";
-                    }
-                    else{
+                else if (parts[0].equalsIgnoreCase("UPDATE_STATUS") && parts.length >= 3) {
+                    Estacion est = this.central.buscarEstacionMemoria(parts[1]);
+                    if (est != null) {
+                        est.setEstado(parts[2]);
+                        this.central.actualizarEstacionEnSistema(est);
+                        respuesta = "OK/STATUS_UPDATED";
+                    } else {
                         respuesta = "STATUS/ERROR/Station not found";
                     }
                 }
