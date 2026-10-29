@@ -12,6 +12,7 @@ public class WM_M {
         private String ipCentral;
         private int puertoCentral;
         private String idWS;
+        private volatile boolean averia = false;
 
         public HiloServidorEngine(int puerto, String ipCentral, int puertoCentral, String idWS) {
             this.puertoServidor = puerto;
@@ -38,43 +39,51 @@ public class WM_M {
             }
         }
 
+        private void actualizarAveria(boolean nuevaAveria) {
+            if (averia == nuevaAveria) {
+                return; // No se repite una notificación del mismo estado
+            }
+
+            averia = nuevaAveria;
+
+            if (nuevaAveria) {
+                notificarCentral("AVERIA/" + idWS);
+                System.out.println("Se ha producido una avería en la WS. Esperando recuperación...");
+
+            } else {
+                notificarCentral("RECUPERACION/" + idWS);
+                System.out.println("La WS se ha recuperado de la avería");
+            }
+        }
+
         private void comprobarSalud(Socket socketEngine) {
-            boolean averia = false; // Determina si la estación se encuentra en avería para no enviar varias veces el mismo mensaje a Central
-            
             try {
                 // Manda información al Engine infinitamente:
                 while (true) {
                     escribirSocket(socketEngine, "STATUS"); // Manda un mensaje de comprobación de estado de salud
                     String respuesta = leerSocket(socketEngine);
+                    socketEngine.setSoTimeout(3000); // Espera un máximo de tres segundos (aunque el Engine va a mandarle los mensajes cada segundo)
                     
-                    // Si el engine no responde, se notifica la avería a Central:
+                    // Si el Engine no responde, se sale del bucle para volver a conectarse con él
                     if (respuesta == null) {
-                        if (!averia) {
-                            notificarCentral("AVERIA/" + idWS);
-                            System.out.println("El Engine se ha desconectado. Reconectando...");
+                        actualizarAveria(true);
+                        break; 
+                    }
+
+                    // El mensaje de la comprobación de salud puede ser 'OK' o 'KO'
+                    switch (respuesta) {
+                        case "OK":
+                            actualizarAveria(false);
                             break;
-                        }
-                    }
 
-                    // Si se ha producido una avería real, notificamos también:
-                    else if (respuesta.equals("KO")) {
-                        if (!averia) {
-                            notificarCentral("AVERIA/" + idWS);
-                            System.out.println("Se ha producido una avería en la Estación de riego. Esperando recuperación...");
-                            averia = true;
-                        }
-                    }
+                        case "KO":
+                            actualizarAveria(true);
+                            break;
 
-                    // Si todo va bien, no se hace nada. En caso de que se haya recuperado de una avería, hay que notificar a Central:
-                    else if (respuesta.equals("OK")) {
-                        if (averia) {
-                            notificarCentral("RECUPERACIÓN/" + idWS);
-                            System.out.println("Se ha solucionado la avería");
-                            averia = false;
-                        }
+                        default:
+                            System.err.println("Respuesta de salud desconocida: " + respuesta);
+                            break;
                     }
-
-                    Thread.sleep(1000); // Provoca el envío cada segundo
                 }
 
             } catch (Exception e) {
@@ -194,18 +203,18 @@ public class WM_M {
             socketCentral = new Socket(ipCentral, Integer.parseInt(puertoCentral));
 
             // Se crea la trama que se enviará a Central para el registro de la estación. Formato: "REGISTRO/idWs"
-            String datos = "REGISTER/" + idWS + ubicacion;
+            String datos = "REGISTER/" + idWS + "/" + ubicacion;
             escribirSocket(socketCentral, datos);
 
             // Se lee la respuesta por parte de Central:
             String respuesta = leerSocket(socketCentral);
-            if (respuesta.startsWith("OK")) {
-                System.out.println("Se ha registrado correctamente la WS en Central");
-            } else {
-                System.out.println("Ha fallado el registro de la WS en Central");
-                System.exit(1);
+
+            if (respuesta == null || !respuesta.startsWith("OK")) {
+                System.err.println("Central no ha aceptado el registro de la WS");
+                System.exit(1); // Si no se produce el registro, se finaliza el programa
             }
 
+            socketCentral.close();
         } catch (Exception e) {
             System.out.println("Ha fallado la conexión con Central");
             System.out.println("Error: " + e.getMessage());
