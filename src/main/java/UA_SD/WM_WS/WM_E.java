@@ -61,16 +61,18 @@ public class WM_E {
     static class HiloConsumidorKafka extends Thread {
         private String ipBroker;
         private String puertoBroker;
+        private String idWS;
 
-        public HiloConsumidorKafka(String ipBroker, String puertoBroker) {
+        public HiloConsumidorKafka(String ipBroker, String puertoBroker, String idWS) {
             this.ipBroker = ipBroker;
             this.puertoBroker = puertoBroker;
+            this.idWS = idWS;
         }
 
         @Override
         public void run() {
             // Creamos el consumidor:
-            KafkaConsumer<String, String> consumidor = crearConsumidor(ipBroker, puertoBroker);
+            KafkaConsumer<String, String> consumidor = crearConsumidor(ipBroker, puertoBroker, idWS);
             
             while (true) {
                 // Recibimos el mensaje por parte de Central (o varios mensajes):
@@ -170,13 +172,13 @@ public class WM_E {
      * @param idOperador
      * @return consumidor
      */
-    private static KafkaConsumer<String, String> crearConsumidor(String ipBroker, String puertoBroker) {
+    private static KafkaConsumer<String, String> crearConsumidor(String ipBroker, String puertoBroker, String idWS) {
         String bootstrapServers = ipBroker + ":" + puertoBroker;
 
         // Se establecen las propiedades:
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "grupo-engine");
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "grupo-engine-" + idWS);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest"); // Para que solo lea los mensajes nuevos
@@ -198,9 +200,9 @@ public class WM_E {
      */
     public static void main(String[] args) {
         // Si los argumentos son incorrectos:
-        if (args.length < 4) {
-            System.out.println("Debe indicar la IP y puerto del Broker del gestor de colas y la IP y puerto del monitor");
-			System.out.println("$./WM_WS_E ip_broker puerto_broker ip_monitor puerto_monitor");
+        if (args.length < 5) {
+            System.out.println("Debe indicar la IP y puerto del Broker del gestor de colas, la IP y puerto del monitor y el ID de la WS");
+			System.out.println("$./WM_WS_E ip_broker puerto_broker ip_monitor puerto_monitor id_ws");
 			System.exit (1);
         }
 
@@ -209,6 +211,7 @@ public class WM_E {
         String puertoBroker = args[1];
         String ipMonitor = args[2];
         String puertoMonitor = args[3];
+        String idWS = args[4];
 
         // ----------------------------------------------
         // INICIAR HILO PARA PROVOCAR UNA AVERÍA MANUAL:
@@ -219,7 +222,7 @@ public class WM_E {
         // ----------------------------------------------------------------
         // INICIAR HILO PARA LA COMUNICACIÓN ENTRE LA CENTRAL Y EL ENGINE:
         // ----------------------------------------------------------------
-        HiloConsumidorKafka hiloKafka = new HiloConsumidorKafka(ipBroker, puertoBroker);
+        HiloConsumidorKafka hiloKafka = new HiloConsumidorKafka(ipBroker, puertoBroker, idWS);
         hiloKafka.start();    
 
         // ------------------------
