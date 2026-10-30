@@ -286,7 +286,7 @@ public class WM_FO {
                 if (evento == null) return null; // Se acabó el tiempo
 
                 if (idOperacion != null && !evento[0].equals(idOperacion)) continue;
-                if (idOperacion == null && evento[0].equals("STATIONS_LIST")) continue; // Lista antigua, se ignora
+                if (idOperacion == null && evento[0].equals("SHOW_STATIONS")) continue; // Lista antigua, se ignora
                 if (idEstacion != null && !evento[1].equals(idEstacion)) continue;
 
                 return evento;
@@ -457,7 +457,7 @@ public class WM_FO {
 
         try {
             // Se publica el mensaje en la cola. Si no se ha recibido respuesta, lanzará una excepción y no se volverá a enviar:
-            productor.send(new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, "STATIONS_LIST/" + idOperador)).get(5, TimeUnit.SECONDS);
+            productor.send(new ProducerRecord<>(TOPIC_PRODUCTOR, idOperador, "SHOW_STATIONS/" + idOperador)).get(5, TimeUnit.SECONDS);
 
         } catch (Exception e) {
             System.err.println("No se ha podido comunicar con Central");
