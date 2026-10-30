@@ -391,7 +391,7 @@ public class WM_Central {
                                     String codOperacion = trama[1];
 
                                     // CASO 01: Petición de Riego
-                                    if (codOperacion.equalsIgnoreCase("01") && trama.length >= 4) {
+                                    if (codOperacion.equalsIgnoreCase("WATERING_REQUEST") && trama.length >= 4) {
                                         String idEstacion = trama[2];
                                         String segundos = trama[3];
 
@@ -399,7 +399,7 @@ public class WM_Central {
                                         if (llimpia) {
                                             ClientHandler handler = WM_Central.this.getMapeoestaciones().get(idEstacion);
                                             if (handler != null) {
-                                                String mensaje = "WATERING_REQUEST/" + idOperario + "/" + idEstacion + "/" + segundos;
+                                                String mensaje = "WATERING_REQUEST_ANSWER/" + idOperario + "/" + idEstacion + "/" + segundos;
                                                 handler.enviarTrama(mensaje, "central_engine");
                                             } else {
                                                 System.out.println("La estación no está conectada por Socket");
@@ -407,7 +407,7 @@ public class WM_Central {
                                         }
                                     }
                                     // CASO 02: Petición de Listado de Estaciones Disponibles
-                                    else if (codOperacion.equalsIgnoreCase("02")) {
+                                    else if (codOperacion.equalsIgnoreCase("SHOW_STATIONS")) {
                                         String listaEst = "STATIONS_LIST";
                                         for (int i = 0; i < WM_Central.this.getaestaciones().size(); i++) {
                                             if (WM_Central.this.getaestaciones().get(i).getEstado().equalsIgnoreCase("AVAILABLE")) {
