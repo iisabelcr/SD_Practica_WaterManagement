@@ -45,7 +45,7 @@ services:
       MAIN_CLASS: UA_SD.WM_WS.WM_M
       APP_ARGS: "9101 ${CENTRAL_HOST} ${CENTRAL_PORT} WS-01 RiverPark"
 
-    ws1-engine:
+  ws1-engine:
     <<: *app
     depends_on: [ws1-monitor]
     environment:
