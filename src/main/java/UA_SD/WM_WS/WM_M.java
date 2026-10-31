@@ -35,22 +35,22 @@ public class WM_M {
 
         public void run() {
             try {
-                    ServerSocket servidor = new ServerSocket(puertoServidor);
-                    System.out.println("Monitor a la escucha del Engine en el puerto local " + puertoServidor + "...");
+                ServerSocket servidor = new ServerSocket(puertoServidor);
+                System.out.println("Monitor a la escucha del Engine en el puerto local " + puertoServidor + "...");
 
-                    while (true) {
-                        Socket socketEngine = servidor.accept(); // El Monitor espera indefinidamente hasta que se conecte el Engine
-                        System.out.println("Conexión establecida con el Engine");
-                        
-                        comprobarSalud(socketEngine); // Iniciamos la comprobación periódica del estado de salud
-                        
-                        // Se cierra el socket (y se procesa la excepción, en caso de que la haya)
-                        try {
-                            socketEngine.close();
-                        } catch (IOException e) { }
+                while (true) {
+                    Socket socketEngine = servidor.accept(); // El Monitor espera indefinidamente hasta que se conecte el Engine
+                    System.out.println("Conexión establecida con el Engine");
+                    
+                    comprobarSalud(socketEngine); // Iniciamos la comprobación periódica del estado de salud
+                    
+                    // Se cierra el socket (y se procesa la excepción, en caso de que la haya)
+                    try {
+                        socketEngine.close();
+                    } catch (IOException e) { }
 
-                        System.out.println("Engine desconectado. Restableciendo conexión...");
-                    }
+                    System.out.println("Engine desconectado. Restableciendo conexión...");
+                }
             
             } catch (Exception e) {
                 System.out.println("Fallo crítico en el Servidor del Monitor");
@@ -279,8 +279,6 @@ public class WM_M {
     private static void iniciarMonitor() {
         try {
             System.out.println("Iniciando el monitor...");
-            Thread.sleep(2000);
-            System.out.println("Estableciendo conexión con Central...");
             Thread.sleep(2000);
         } catch (InterruptedException e) {
             System.out.println("Fallo al iniciar la aplicación");

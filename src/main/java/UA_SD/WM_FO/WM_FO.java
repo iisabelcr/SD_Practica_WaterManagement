@@ -196,7 +196,7 @@ public class WM_FO {
         // Se seguirá pidiendo la opción hasta que se inserte un número correcto
         while (!correcto) {
             try {
-                System.out.println("Selecciona una opción: ");
+                System.out.print("Selecciona una opción: ");
                 opcion = Integer.parseInt(scanner.nextLine());
 
                 if (opcion >= 1 && opcion <= 4) {
@@ -403,7 +403,7 @@ public class WM_FO {
         // Se pide la estación hasta que sea una de la lista (o se cancela):
         String estacion = null;
         while (estacion == null) {
-            System.out.println("Introduce el ID de la estación deseada (escribe 'q' para cancelar): ");
+            System.out.print("Introduce el ID de la estación deseada (escribe 'q' para cancelar): ");
             String entrada = scanner.nextLine().trim();
 
             if (entrada.equalsIgnoreCase("q")) {
@@ -427,7 +427,7 @@ public class WM_FO {
 
         while (segundos <= 0) {
             try {
-                System.out.println("Introduce el tiempo que permanecerá activada (en segundos): ");
+                System.out.print("Introduce el tiempo que permanecerá activada (en segundos): ");
                 segundos = Integer.parseInt(scanner.nextLine().trim());
 
                 if (segundos <= 0) {
