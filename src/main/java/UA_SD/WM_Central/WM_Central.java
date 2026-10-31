@@ -210,7 +210,11 @@ public class WM_Central {
             central.incioconsumidorkafkaengine(ipKafka, puertoKafka, "engine_central");
 
             central.menu();
-
+            try {
+                new WebPanel(central, WebPanel.puertoPorDefecto()).iniciar();
+            } catch (IOException e) {
+                System.err.println("No se pudo iniciar el panel web: " + e.getMessage());
+            }
             try(ServerSocket servidorsocket = new ServerSocket(Integer.parseInt(puerto))){
                 for(;;) {
                     Socket skCliente = servidorsocket.accept();
@@ -380,7 +384,7 @@ public class WM_Central {
             }
             else if (mensaje.equalsIgnoreCase("MANUAL_REQUEST") && trama.length >= 3) {
                 String error = iniciarRiegoManual(idEstacion, trama[2], "MANUAL");
-                if (error==null) {
+                if (error!=null) {
                     enviarmensajekafka("MANUAL_DENIED/" + idEstacion + "/" + error, "central_engine");
                 }
             }
