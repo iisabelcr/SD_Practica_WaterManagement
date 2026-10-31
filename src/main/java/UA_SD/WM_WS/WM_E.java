@@ -35,31 +35,28 @@ public class WM_E {
 
     
     /**
-     * Clase interna que permite gestionar la lógica de provocar averías en un hilo distinto al principal
-     * HiloKO
+     * Clase interna que permite gestionar las opciones escogidas del menú, siendo capaz de provocar una avería o un riego
+     * HiloMeno
      */
-    static class HiloKO extends Thread {
+    static class HiloMenu extends Thread {
         @Override
         public void run() {
             Scanner scanner = new Scanner(System.in);
             try {
                 while (true) {
-                    // Menú interactivo:
-                    System.out.println("\n--- ESTACIÓN " + idWS + " ---");
-                    System.out.println("1. Solicitar riego manual");
-                    System.out.println("2. Finalizar el riego en curso");
-                    System.out.println("3. " + (averia ? "Reparar la avería" : "Provocar una avería"));
-                    System.out.println("4. Ver estado");
-                    System.out.println("5. Salir");
+                    clear();
 
-                    switch (scanner.nextLine().trim()) {
-                        case "1":
+                    // Menú interactivo:
+                    int opcion = mostrarMenu(scanner);
+
+                    switch (opcion) {
+                        case 1:
                             if (!monitorConectado) {
                                 System.out.println("No se puede iniciar un riego manual: el Monitor no está conectado al Engine");
                                 break;
                             }
 
-                            System.out.println("Segundos de riego: ");
+                            System.out.print("Segundos de riego: ");
                             try {
                                 int seg = Integer.parseInt(scanner.nextLine().trim());
                                 if (seg <= 0) throw new NumberFormatException();
@@ -74,7 +71,7 @@ public class WM_E {
 
                             break;
 
-                        case "2":
+                        case 2:
                             if (riegoActual == null) {
                                 System.out.println("No hay ningún riego en curso");
 
@@ -84,7 +81,7 @@ public class WM_E {
 
                             break;
 
-                        case "3":
+                        case 3:
                             averia = !averia;
                             if (averia) {
                                 detenerRiego(); // Una avería corta el riego inmediatamente
@@ -92,11 +89,11 @@ public class WM_E {
                             System.out.println(averia ? "Estación AVERIADA" : "Estación reparada"); // Dependiendo de si está averiada o no, se muestra un mensaje u otro
                             break;
 
-                        case "4":
+                        case 4:
                             System.out.println("Avería: " + averia + " | Fuera de servicio: " + bloqueada + " | Regando: " + (riegoActual != null) + " | Monitor conectado: " + monitorConectado);
                             break;
                         
-                        case "5":
+                        case 5:
                             System.out.println("Cerrando estación...");
                             scanner.close();
 
@@ -317,13 +314,50 @@ public class WM_E {
 
 
     /**
+     * Función que muestra y procesa el menú.
+     * @return opción escogida
+     */
+    private static int mostrarMenu(Scanner scanner) {
+        System.out.println("+-----------------------------+");
+        System.out.println("|       WATERING STATION: " + idWS + "|");
+        System.out.println("+-----------------------------+\n");
+
+        System.out.println("1. Solicitar riego manual");
+        System.out.println("2. Finalizar el riego en curso");
+        System.out.println("3. " + (averia ? "Reparar la avería" : "Provocar una avería"));
+        System.out.println("4. Ver estado");
+        System.out.println("5. Salir");
+
+        int opcion = -1;
+        boolean correcto = false;
+
+        // Se seguirá pidiendo la opción hasta que se inserte un número correcto
+        while (!correcto) {
+            try {
+                System.out.print("Selecciona una opción: ");
+                opcion = Integer.parseInt(scanner.nextLine());
+
+                if (opcion >= 1 && opcion <= 5) {
+                    correcto = true;
+                } else {
+                    System.out.println("No existe esa opción");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("La opción debe ser numérica");
+            }
+        }
+
+        return opcion;
+    }
+
+
+
+    /**
      * Procedimiento que muestra mensajes de iniciación del programa.
      */
     private static void iniciarEngine() {
         try {
             System.out.println("Iniciando el Engine de la Estación de riego...");
-            Thread.sleep(2000);
-            System.out.println("Estableciendo conexión con el Monitor...");
             Thread.sleep(2000);
         } catch (InterruptedException e) {
             System.out.println("Fallo al iniciar la aplicación");
@@ -446,11 +480,13 @@ public class WM_E {
 
         productor = crearProductor(ipBroker, puertoBroker); // Se crea el productor
 
-        // ----------------------------------------------
-        // INICIAR HILO PARA PROVOCAR UNA AVERÍA MANUAL:
-        // ----------------------------------------------
-        HiloKO hiloKO = new HiloKO();
-        hiloKO.start();
+        iniciarEngine();
+
+        // ---------------------------------------------------------------
+        // INICIAR HILO PARA GESTIONAR EL MENÚ Y LAS OPCIONES DEL ENGINE:
+        // ---------------------------------------------------------------
+        HiloMenu hiloMenu = new HiloMenu();
+        hiloMenu.start();
 
         // ----------------------------------------------------------------
         // INICIAR HILO PARA LA COMUNICACIÓN ENTRE LA CENTRAL Y EL ENGINE:
@@ -461,8 +497,6 @@ public class WM_E {
         // ------------------------
         // CONEXIÓN CON EL MONITOR:
         // ------------------------
-        
-        iniciarEngine();
 
         int puerto;
         try {
