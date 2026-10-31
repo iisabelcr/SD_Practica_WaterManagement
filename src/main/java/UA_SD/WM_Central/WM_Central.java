@@ -649,27 +649,25 @@ public class WM_Central {
      */
     public synchronized void notificarFuga(String idEstacion, boolean fuga){
         Estacion est = buscarEstacionMemoria(idEstacion);
-        if(est == null) return;
-
-        String operario = est.getOperarioId();
-
-        if(fuga){
-            //Un bloqueo manual tiene prioridad: no se pisa OUT_OF_SERVICE con LEAK
-            if(!est.getEstado().equalsIgnoreCase("OUT_OF_SERVICE")){
-                est.setEstado("LEAK");
-            }
-            est.setCaudalactual(0.0);
-            est.setOperarioId(null);
-            actualizarEstacionEnSistema(est);
-            enviarAFO(operario, "LEAK_ALERT/" + idEstacion);
-        }
-        else{
-            if(est.getEstado().equalsIgnoreCase("LEAK")){
-                est.setEstado("AVAILABLE");
+        if(est != null) {
+            String operario = est.getOperarioId();
+            if (fuga) {
+                //Un bloqueo manual tiene prioridad: no se pisa OUT_OF_SERVICE con LEAK
+                if (!est.getEstado().equalsIgnoreCase("OUT_OF_SERVICE")) {
+                    est.setEstado("LEAK");
+                }
+                est.setCaudalactual(0.0);
+                est.setOperarioId(null);
                 actualizarEstacionEnSistema(est);
+                enviarAFO(operario, "LEAK_ALERT/" + idEstacion);
+            } else {
+                if (est.getEstado().equalsIgnoreCase("LEAK")) {
+                    est.setEstado("AVAILABLE");
+                    actualizarEstacionEnSistema(est);
+                }
+                //Ya no hay operario asignado, así que no hay clave: lo reciben todos los FO
+                enviarmensajekafka("LEAK_RESOLVED/" + idEstacion, "central_fo", null);
             }
-            //Ya no hay operario asignado, así que no hay clave: lo reciben todos los FO
-            enviarmensajekafka("LEAK_RESOLVED/" + idEstacion, "central_fo", null);
         }
     }
 
@@ -715,9 +713,9 @@ public class WM_Central {
      */
     public Estacion buscarEstacionMemoria(String id) {
         if (id!=null) {
-            for (Estacion e : this.estaciones) {
-                if (e.getId().equalsIgnoreCase(id)) {
-                    return e;
+            for (int i = 0; i < this.estaciones.size(); i++) {
+                if (estaciones.get(i).getId().equalsIgnoreCase(id)) {
+                    return estaciones.get(i);
                 }
             }
         }
