@@ -348,9 +348,9 @@ public class WM_E {
      * @return opción escogida
      */
     private static int mostrarMenu(Scanner scanner) {
-        System.out.println("+------------------------------------+");
+        System.out.println("+-------------------------------------+");
         System.out.println("|       WATERING STATION: " + idWS + "       |");
-        System.out.println("+------------------------------------+\n");
+        System.out.println("+-------------------------------------+\n");
 
         System.out.println("1. Solicitar riego manual");
         System.out.println("2. Finalizar el riego en curso");
@@ -510,6 +510,7 @@ public class WM_E {
 
         productor = crearProductor(ipBroker, puertoBroker); // Se crea el productor
 
+        clear();
         iniciarEngine();
 
         // Se inicia el hilo consumidor (para las comunicaciones Central-Engine)
@@ -532,12 +533,12 @@ public class WM_E {
 
         // Se inicia el scanner
         Scanner scanner = new Scanner(System.in);
-        clear();
 
         try {
             boolean salir = false;
 
             while (!salir) {
+                clear();
                 int opcion = mostrarMenu(scanner);
 
                 switch (opcion) {
