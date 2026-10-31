@@ -17,6 +17,9 @@ import java.util.Collections;
 import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Scanner;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 
 public class WM_E {
@@ -31,85 +34,60 @@ public class WM_E {
     static volatile boolean monitorConectado = false; // Determina que el monitor sigue conectado al engine
     static String idWS;
     static KafkaProducer<String, String> productor;
+    static final BlockingQueue<String> eventos = new LinkedBlockingQueue<>(); // Cola de eventos (para que no se superpongan los mensajes)
 
 
-    
+
     /**
-     * Clase interna que permite gestionar las opciones escogidas del menú, siendo capaz de provocar una avería o un riego
-     * HiloMeno
+     * Hilo que maneja la comunicación mediante sockets con el Monitor
+     * HiloMonitor
      */
-    static class HiloMenu extends Thread {
+    static class HiloMonitor extends Thread {
+        private final String ipMonitor;
+        private final int puerto;
+
+        public HiloMonitor(String ipMonitor, int puerto) {
+            this.ipMonitor = ipMonitor;
+            this.puerto = puerto;
+            setDaemon(true);
+        }
+
         @Override
         public void run() {
-            Scanner scanner = new Scanner(System.in);
-            try {
-                while (true) {
-                    clear();
+            while (true) {
+                try (Socket socketMonitor = new Socket(ipMonitor, puerto)) {
+                    System.out.println("Engine conectado con el Monitor");
+                    monitorConectado = true;
 
-                    // Menú interactivo:
-                    int opcion = mostrarMenu(scanner);
+                    while (true) {
+                        String respuesta = leerSocket(socketMonitor);
 
-                    switch (opcion) {
-                        case 1:
-                            if (!monitorConectado) {
-                                System.out.println("No se puede iniciar un riego manual: el Monitor no está conectado al Engine");
-                                break;
-                            }
+                        if (respuesta == null) {
+                            monitorConectado = false;
 
-                            System.out.print("Segundos de riego: ");
-                            try {
-                                int seg = Integer.parseInt(scanner.nextLine().trim());
-                                if (seg <= 0) throw new NumberFormatException();
-
-                                // Se solicita a Central el inicio de riego manual:
-                                enviarCentral("MANUAL_REQUEST/" + idWS + "/" + seg);
-                                System.out.println("Solicitud enviada a Central. Esperando autorización...");
-
-                            } catch (NumberFormatException e) {
-                                System.out.println("Debes introducir un número entero mayor que 0");
-                            }
-
-                            break;
-
-                        case 2:
-                            if (riegoActual == null) {
-                                System.out.println("No hay ningún riego en curso");
-
-                            } else {
+                            // Si hay un riego en curso:
+                            if (riegoActual != null) {
+                                System.out.println("El monitor se ha caido, deteniendo el riego...");
                                 detenerRiego();
                             }
 
                             break;
+                        }
 
-                        case 3:
-                            averia = !averia;
-                            if (averia) {
-                                detenerRiego(); // Una avería corta el riego inmediatamente
-                            }  
-                            System.out.println(averia ? "Estación AVERIADA" : "Estación reparada"); // Dependiendo de si está averiada o no, se muestra un mensaje u otro
-                            break;
-
-                        case 4:
-                            System.out.println("Avería: " + averia + " | Fuera de servicio: " + bloqueada + " | Regando: " + (riegoActual != null) + " | Monitor conectado: " + monitorConectado);
-                            break;
-                        
-                        case 5:
-                            System.out.println("Cerrando estación...");
-                            scanner.close();
-
-                            if (productor != null) {
-                                productor.close(); 
-                            }
-                            
-                            System.exit(0);
-
-                        default:
-                            System.out.println("Opción no válida");
+                        escribirSocket(socketMonitor, averia ? "KO" : "OK");
                     }
+
+                } catch (Exception e) {
+                    System.out.println("No se ha podido conectar con el Monitor: " + e.getMessage());
                 }
-            } catch (NoSuchElementException e) {
-                // Sin teclado (contenedor sin -it): la estación sigue funcionando sin menú
-                System.out.println("Sin teclado disponible: menú desactivado");
+
+                monitorConectado = false;
+                System.out.println("Reintentando conexión con el Monitor en 3 segundos...");
+                
+                try {
+                    Thread.sleep(3000);
+
+                } catch (InterruptedException e) {}
             }
         }
     }
@@ -168,10 +146,60 @@ public class WM_E {
 
             enviarCentral("WATERING_END/" + idWS + "/" + transcurridos + "/" + ajustarValor(volumen));
             System.out.println("Riego finalizado (" + transcurridos + " s, " + ajustarValor(volumen) + " L)");
+            eventos.add("FIN");
         }
     }
     
     
+
+    /**
+     * Genera una pausa antes de volver al menú tras la ejecución de cualquier opción.
+     * @param scanner
+     */
+    private static void pausar(Scanner scanner) {
+        System.out.print("\nPulsa Enter para volver al menú... ");
+        scanner.nextLine();
+    }
+
+
+
+    /**
+     * Función que envía una petición de inicio de riego al Engine.
+     * @param scanner
+     */
+    private static void solicitarRiegoManual(Scanner scanner) {
+        System.out.print("Segundos de riego: ");
+        int segundos;
+        try {
+            segundos = Integer.parseInt(scanner.nextLine().trim());
+            if (segundos <= 0) throw new NumberFormatException();
+
+        } catch (NumberFormatException e) {
+            System.out.println("Debes introducir un número entero mayor que 0");
+            return;
+        }
+
+        eventos.clear(); // Se vacía la cola
+        enviarCentral("MANUAL_REQUEST/" + idWS + "/" + segundos);
+        System.out.println("Solicitud enviada a Central. Esperando autorización...");
+
+        try {
+            // Se espera a la respuesta de Central, si autoriza o no:
+            String resultado = eventos.poll(20, TimeUnit.SECONDS);
+
+            if (resultado == null) {
+                System.out.println("Central no ha respondido a tiempo");
+
+            } else if (resultado.equals("INICIADO")) {
+                while (!"FIN".equals(eventos.take())) {} // Se espera hasta que reciba el evento de fin de riego en la cola
+            }
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+
 
     /**
      * Función que inicia el riego de la estación
@@ -200,6 +228,7 @@ public class WM_E {
         if (motivo != null) {
             System.out.println("Riego rechazado: " + motivo);
             enviarCentral("WATERING_RESPONSE/" + idWS + "/NOK/" + motivo);
+            eventos.add("RECHAZADO");
             return;
         }
 
@@ -209,6 +238,7 @@ public class WM_E {
         // Se inicia la secuencia de riego:
         riegoActual = new HiloRiego(segundos);
         riegoActual.start();
+        eventos.add("INICIADO");
     }
 
 
@@ -318,15 +348,15 @@ public class WM_E {
      * @return opción escogida
      */
     private static int mostrarMenu(Scanner scanner) {
-        System.out.println("+-----------------------------+");
-        System.out.println("|       WATERING STATION: " + idWS + "|");
-        System.out.println("+-----------------------------+\n");
+        System.out.println("+------------------------------------+");
+        System.out.println("|       WATERING STATION: " + idWS + "       |");
+        System.out.println("+------------------------------------+\n");
 
         System.out.println("1. Solicitar riego manual");
         System.out.println("2. Finalizar el riego en curso");
         System.out.println("3. " + (averia ? "Reparar la avería" : "Provocar una avería"));
         System.out.println("4. Ver estado");
-        System.out.println("5. Salir");
+        System.out.println("5. Salir\n");
 
         int opcion = -1;
         boolean correcto = false;
@@ -482,62 +512,86 @@ public class WM_E {
 
         iniciarEngine();
 
-        // ---------------------------------------------------------------
-        // INICIAR HILO PARA GESTIONAR EL MENÚ Y LAS OPCIONES DEL ENGINE:
-        // ---------------------------------------------------------------
-        HiloMenu hiloMenu = new HiloMenu();
-        hiloMenu.start();
-
-        // ----------------------------------------------------------------
-        // INICIAR HILO PARA LA COMUNICACIÓN ENTRE LA CENTRAL Y EL ENGINE:
-        // ----------------------------------------------------------------
+        // Se inicia el hilo consumidor (para las comunicaciones Central-Engine)
         HiloConsumidorKafka hiloKafka = new HiloConsumidorKafka(ipBroker, puertoBroker);
-        hiloKafka.start();    
-
-        // ------------------------
-        // CONEXIÓN CON EL MONITOR:
-        // ------------------------
+        hiloKafka.setDaemon(true);
+        hiloKafka.start();
 
         int puerto;
         try {
             puerto = Integer.parseInt(puertoMonitor);
-
-        } catch (NumberFormatException e) { // Se lanza una excepción si el puerto no es un número
+        } catch (NumberFormatException e) {
             System.err.println("El puerto del Monitor debe ser un número");
             System.exit(1);
             return;
         }
 
-        // Conecta con el Monitor. Si falla, vuelve a intentarlo
-        while (true) {
-            try (Socket socketMonitor = new Socket(ipMonitor, puerto)) {
-                System.out.println("Engine conectado con el Monitor");
-                monitorConectado = true;
+        // Se inicia el hilo que mantiene la comunicación con el Monitor mediante sockets
+        HiloMonitor hiloMonitor = new HiloMonitor(ipMonitor, puerto);
+        hiloMonitor.start();
 
-                while (true) {
-                    String respuesta = leerSocket(socketMonitor);
-                    if (respuesta == null) { // El Monitor se ha caído: se vuelve a conectar
-                        monitorConectado = false;
-                        
-                        if (riegoActual != null) {
-                            System.out.println("El monitor se ha caido, deteniendo el riego...");
-                            detenerRiego(); // Si se cae el monitor, se detiene el riego 
+        // Se inicia el scanner
+        Scanner scanner = new Scanner(System.in);
+        clear();
+
+        try {
+            boolean salir = false;
+
+            while (!salir) {
+                int opcion = mostrarMenu(scanner);
+
+                switch (opcion) {
+                    case 1:
+                        if (!monitorConectado) {
+                            System.out.println("No se puede iniciar un riego manual: el Monitor no está conectado al Engine");
+                        } else {
+                            solicitarRiegoManual(scanner);
                         }
 
-                        break; 
-                    }
+                        pausar(scanner);
+                        break;
 
-                    // El Monitor siempre manda "STATUS/id", por lo que no hace falta comprobar la respuesta:
-                    escribirSocket(socketMonitor, averia ? "KO" : "OK");
+                    case 2:
+                        if (riegoActual == null) {
+                            System.out.println("No hay ningún riego en curso");
+
+                        } else {
+                            detenerRiego();
+                        }
+
+                        pausar(scanner);
+                        break;
+
+                    case 3:
+                        averia = !averia;
+                        if (averia) detenerRiego();
+                        System.out.println(averia ? "Estación AVERIADA" : "Estación reparada");
+                        
+                        pausar(scanner);
+                        break;
+
+                    case 4:
+                        System.out.println("Avería: " + averia + " | Fuera de servicio: " + bloqueada + " | Regando: " + (riegoActual != null) + " | Monitor conectado: " + monitorConectado);
+                        pausar(scanner);
+                        break;
+
+                    case 5:
+                        salir = true;
+                        break;
                 }
-            } catch (Exception e) {
-                System.out.println("No se ha podido conectar con el Monitor: " + e.getMessage());
             }
 
-            System.out.println("Reintentando conexión con el Monitor en 3 segundos...");
+        } catch (NoSuchElementException e) {
+            // Sin teclado (contenedor sin -it): la estación sigue funcionando sin menú
+            System.out.println("Sin teclado disponible: menú desactivado");
             try {
-                Thread.sleep(3000);
-            } catch (InterruptedException e) {}
+                Thread.currentThread().join();
+            } catch (InterruptedException ex) {}
         }
+
+        System.out.println("Cerrando estación...");
+        scanner.close();
+        productor.close();
+        System.exit(0);
     }
 }
