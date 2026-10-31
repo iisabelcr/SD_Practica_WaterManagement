@@ -28,6 +28,7 @@ public class WM_E {
     static volatile boolean averia = false; // Avería provocada desde el menú
     static volatile boolean bloqueada = false; // Fuera de servicio por orden de Central
     static volatile HiloRiego riegoActual = null; // Indica si hay un riego en curso o no (null si no lo hay)
+    static volatile boolean monitorConectado = false; // Determina que el monitor sigue conectado al engine
     static String idWS;
     static KafkaProducer<String, String> productor;
 
@@ -52,6 +53,11 @@ public class WM_E {
 
                     switch (scanner.nextLine().trim()) {
                         case "1":
+                            if (!monitorConectado) {
+                                System.out.println("No se puede iniciar un riego manual: el Monitor no está conectado al Engine");
+                                break;
+                            }
+
                             System.out.println("Segundos de riego: ");
                             try {
                                 int seg = Integer.parseInt(scanner.nextLine().trim());
@@ -86,7 +92,7 @@ public class WM_E {
                             break;
 
                         case "4":
-                            System.out.println("Avería: " + averia + " | Fuera de servicio: " + bloqueada + " | Regando: " + (riegoActual != null));
+                            System.out.println("Avería: " + averia + " | Fuera de servicio: " + bloqueada + " | Regando: " + (riegoActual != null) + " | Monitor conectado: " + monitorConectado);
                             break;
 
                         default:
@@ -177,6 +183,7 @@ public class WM_E {
 
         if (motivo == null) {
             if (averia) motivo = "La estación está averiada";
+            else if (!monitorConectado) motivo = "El monitor no está conectado";
             else if (bloqueada) motivo = "La estación está fuera de servicio";
             else if (riegoActual != null) motivo = "La estación ya está regando";
         }
@@ -459,11 +466,21 @@ public class WM_E {
         // Conecta con el Monitor. Si falla, vuelve a intentarlo
         while (true) {
             try (Socket socketMonitor = new Socket(ipMonitor, puerto)) {
-                System.out.println("Conectado con el Monitor");
+                System.out.println("Engine conectado con el Monitor");
+                monitorConectado = true;
 
                 while (true) {
                     String respuesta = leerSocket(socketMonitor);
-                    if (respuesta == null) break; // El Monitor se ha caído: se vuelve a conectar
+                    if (respuesta == null) { // El Monitor se ha caído: se vuelve a conectar
+                        monitorConectado = false;
+                        
+                        if (riegoActual != null) {
+                            System.out.println("El monitor se ha caido, deteniendo el riego...");
+                            detenerRiego(); // Si se cae el monitor, se detiene el riego 
+                        }
+
+                        break; 
+                    }
 
                     // El Monitor siempre manda "STATUS/id", por lo que no hace falta comprobar la respuesta:
                     escribirSocket(socketMonitor, averia ? "KO" : "OK");
