@@ -25,6 +25,8 @@ public class DatabaseManager {
     //Es el metodo encargado de ejecutar las sentencias SQL iniciales
     //para crear las tablas si la base de datos es nueva o no han sido creadas aún.
     public static void initDatabase() {
+        //operarioId puede ser NULL (se pone a null al acabar el riego) y no lleva clave foránea
+        //porque también guarda el valor "CENTRAL", que no es un operario real
         String sqlEstaciones = """
             CREATE TABLE IF NOT EXISTS estaciones(
                 id TEXT PRIMARY KEY,
@@ -35,7 +37,7 @@ public class DatabaseManager {
                 operarioId TEXT 
             );
             """;
-//No se si el operarioID tiene que ser not null o si lo puede ser
+
         String sqlOperarios = """
             CREATE TABLE IF NOT EXISTS operarios (
                 id TEXT PRIMARY KEY,
@@ -52,7 +54,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error inicializando BD: " + e.getMessage());
         }
     }
-    public static void insertarOperarios(Operario myoperario){
+    public static synchronized void insertarOperarios(Operario myoperario){
         String sql="INSERT INTO operarios (id,nombre) VALUES (?,?)";
         try(Connection conn = connect();
             PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -64,7 +66,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al insertar en la base de datos BD: " + e.getMessage());
         }
     }
-    public static void insertarEstacion(Estacion myestacion){
+    public static synchronized void insertarEstacion(Estacion myestacion){
         //Esto es para insertar dentro de los atributos de una estacion sus valores
         String sql="INSERT INTO estaciones (id,ubicacion,estado,caudalact,volumenacum,operarioId) VALUES (?,?,?,?,?,?)";
         //Intentamos ver si funciona la conexion
@@ -84,7 +86,8 @@ public class DatabaseManager {
         }
     }
     //Esta no se pa que muy bien la quiero
-    public static List<Operario> leerTodasOperario(){
+    //(Ya no imprime por consola: la capa de datos solo lee y devuelve la lista)
+    public static synchronized List<Operario> leerTodasOperario(){
         List<Operario> lista = new ArrayList<>();
         String sql="SELECT id,nombre FROM operarios";
         try( //1. Abre el canal de comunicación con el archivo SQLite.
@@ -97,7 +100,6 @@ public class DatabaseManager {
             while (rs.next()){
                 String id=rs.getString("id");
                 String nombre=rs.getString("nombre");
-                System.out.printf("Operario -> ID: %s | Nombre: %s%n", id, nombre);
                 lista.add(new Operario(id,nombre));
             }
         }catch (SQLException e){
@@ -105,9 +107,10 @@ public class DatabaseManager {
         }
         return lista;
     }
-    public static List<Estacion> leerTodasEstaciones(){
+    public static synchronized List<Estacion> leerTodasEstaciones(){
         List<Estacion> lista = new ArrayList<>();
-        String sql="SELECT id,ubicacion,estado,caudalact,volumenacum FROM estaciones";
+        //Se añade operarioId al SELECT: antes se leía abajo pero no se pedía, y lanzaba una SQLException
+        String sql="SELECT id,ubicacion,estado,caudalact,volumenacum,operarioId FROM estaciones";
         try( //1. Abre el canal de comunicación con el archivo SQLite.
              Connection conn = connect();
              //2. El objeto que transporta y ejecuta la orden SQL en la base de datos. Podria haber puesto PreparedStatement
@@ -122,10 +125,6 @@ public class DatabaseManager {
                 double caudal=rs.getDouble("caudalact");
                 double volumen=rs.getDouble("volumenacum");
                 String operarioId = rs.getString("operarioId");
-                //Recordatorio println no va con comas entonces utilizo printfn
-                //Es estupido que haya puesto en variables pero en fin
-                System.out.printf("Estación -> ID: %s | Ubicación: %s | Estado: %s | Caudal: %.2f | Vol: %.2f%n",
-                        id, ubicacion, estado, caudal, volumen);
                 lista.add(new Estacion(id, ubicacion, estado, caudal, volumen, operarioId));
             }
         }catch (SQLException e){
@@ -133,32 +132,33 @@ public class DatabaseManager {
         }
         return lista;
     }
-    public static void borrarOperario(Operario myoperario){
-        String sql="DELETE FROM operario where id=?";
+    public static synchronized void borrarOperario(Operario myoperario){
+        //La tabla se llama operarios (antes ponía operario y siempre fallaba)
+        String sql="DELETE FROM operarios where id=?";
         try(
-            Connection conn = connect();
-            PreparedStatement pstmt = conn.prepareStatement(sql)){
+                Connection conn = connect();
+                PreparedStatement pstmt = conn.prepareStatement(sql)){
             pstmt.setString(1,myoperario.getId());
             pstmt.executeUpdate();
         }catch (SQLException e){
             System.err.println("[BD Error] Error al borrar: " + e.getMessage());
         }
     }
-    public static void borrarEstacion(Estacion myestacion){
+    public static synchronized void borrarEstacion(Estacion myestacion){
         String sql="DELETE FROM estaciones where id=?";
         try(
-            Connection conn = connect();
-            PreparedStatement pstmt = conn.prepareStatement(sql)){
+                Connection conn = connect();
+                PreparedStatement pstmt = conn.prepareStatement(sql)){
             pstmt.setString(1, myestacion.getId());
             pstmt.executeUpdate();
         }catch (SQLException e){
             System.err.println("[BD Error] Error al borrar: " + e.getMessage());
         }
     }
-    public static void actualizarOperario(Operario myoperario){
+    public static synchronized void actualizarOperario(Operario myoperario){
         String sql ="UPDATE operarios set nombre = ? where id = ?";
         try(Connection conn = connect();
-        PreparedStatement pstmt = conn.prepareStatement(sql)){
+            PreparedStatement pstmt = conn.prepareStatement(sql)){
             pstmt.setString(1,myoperario.getNombre());
             pstmt.setString(2, myoperario.getId());
             pstmt.executeUpdate();
@@ -166,7 +166,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al actualizar la base de datos: " + e.getMessage());
         }
     }
-    public static void actualizarEstacion(Estacion myestacion){
+    public static synchronized void actualizarEstacion(Estacion myestacion){
         String sql="UPDATE estaciones set ubicacion = ?, estado = ?,caudalact = ?,volumenacum = ?,operarioId = ? WHERE id = ?";
         try(Connection conn= connect();
             PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -183,7 +183,7 @@ public class DatabaseManager {
             System.err.println("[BD Error] Error al actualizar la base de datos: " + e.getMessage());
         }
     }
-    public static Operario obtenerOperario(String id){
+    public static synchronized Operario obtenerOperario(String id){
         String sql="SELECT id,nombre FROM operarios where id = ?";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -201,7 +201,7 @@ public class DatabaseManager {
         }
         return null;
     }
-    public static Estacion obtenerEstacion(String id){
+    public static synchronized Estacion obtenerEstacion(String id){
         String sql="SELECT id,ubicacion,estado,caudalact,volumenacum,operarioId FROM estaciones where id = ?";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -223,5 +223,8 @@ public class DatabaseManager {
         }
         return null;
     }
-
+    //Se les ha añadido la palabras synchronized a cada uno de estos metodos crud porque si dos hilos
+    //quieren acceder a la base de datos ,y uno de los hilos lllega un momento mas tarde que el otro se vera
+    //que esta bloqueado la base de datos y entonces se lanzara una excepcion y es por eso que se pone
+    //que esten sincronizados
 }

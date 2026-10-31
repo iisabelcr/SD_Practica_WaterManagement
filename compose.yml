@@ -1,13 +1,16 @@
+name: watermanagement
+
 x-app: &app
-  build: .
+  image: wm-app
   restart: on-failure
   stdin_open: true
   tty: true
 
 services:
-  # ================= SOLO LOCAL (profile "local") =================
+  # ============ SOLO LOCAL (profile "local") ============
   kafka:
     profiles: [local]
+    container_name: Kafka
     image: apache/kafka:3.8.0
     environment:
       KAFKA_NODE_ID: 1
@@ -24,6 +27,7 @@ services:
   central:
     <<: *app
     profiles: [local]
+    container_name: Central
     ports: ["5000:5000"]
     volumes: ["central-data:/data"]
     environment:
@@ -32,12 +36,15 @@ services:
       KAFKA_PORT: 9092
       DB_PATH: /data/central.db
 
-  # ======================= ESTACIÓN WS-01 =========================
+  # ================= ESTACIÓN WS-01 =====================
   ws1-monitor:
     <<: *app
+    build: .
+    container_name: WS_M1
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_M
       APP_ARGS: "9101 ${CENTRAL_HOST} ${CENTRAL_PORT} WS-01 RiverPark"
+
   ws1-engine:
     <<: *app
     depends_on: [ws1-monitor]
@@ -45,12 +52,14 @@ services:
       MAIN_CLASS: UA_SD.WM_WS.WM_E
       APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} ws1-monitor 9101"
 
-  # ======================= ESTACIÓN WS-02 =========================
+  # ================= ESTACIÓN WS-02 =====================
   ws2-monitor:
     <<: *app
+    container_name: WS_M2
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_M
       APP_ARGS: "9102 ${CENTRAL_HOST} ${CENTRAL_PORT} WS-02 CentralPark"
+
   ws2-engine:
     <<: *app
     depends_on: [ws2-monitor]
@@ -58,17 +67,20 @@ services:
       MAIN_CLASS: UA_SD.WM_WS.WM_E
       APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} ws2-monitor 9102"
 
-  # ========================= OPERARIOS ============================
+  # ===================== OPERARIOS ======================
   fo1:
     <<: *app
+    volumes: ["./servicios_fo1.txt:/app/servicios.txt:ro"]
     environment:
       MAIN_CLASS: UA_SD.WM_FO.WM_FO
-      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} FO-01"
+      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} FO-01 /app/servicios.txt"
+
   fo2:
     <<: *app
+    volumes: ["./servicios_fo2.txt:/app/servicios.txt:ro"]
     environment:
       MAIN_CLASS: UA_SD.WM_FO.WM_FO
-      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} FO-02"
+      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} FO-02 /app/servicios.txt"
 
 volumes:
   central-data:

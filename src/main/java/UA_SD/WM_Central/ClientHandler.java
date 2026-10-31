@@ -32,71 +32,85 @@ public class ClientHandler implements Runnable{
         }
     }
     public String leerSocket(){
-        String aux = "";
         try{
-           aux= entrada.readLine();
+            return entrada.readLine();
         }catch(IOException e){
             System.out.println("Error en leer lo de la entrada");
+            //Se devuelve null (y no "") para que el while del run() termine cuando se cae la conexión
+            return null;
         }
-        return aux;
     }
     public void escribirSocket(String mensaje){
-        try{
-            salida.println(mensaje);
-        }catch(Exception e){
-            System.err.println("Error en leer lo de la entrada");
-        }
+        //PrintWriter nunca lanza excepciones, por eso ya no hace falta el try/catch
+        salida.println(mensaje);
     }
     public String processtrama(String trama){
         String respuesta;
         if(trama!=null){
             String[] parts =trama.split("/");
             if (parts.length>=1){
-                if(parts[0].equalsIgnoreCase("REGISTRO") && parts.length>=3){
-                    Estacion estacionmdb= DatabaseManager.obtenerEstacion(parts[1]);
-                    //Se comprueba si estaba antes en la base de datos
-                    if(estacionmdb==null){
-                        Estacion nueva =new Estacion(parts[1],parts[2]);
-                        this.central.anadirestacion(nueva);
-                        respuesta=" OK/ESTACION_REGISTRADA";
-                        this.idEstacion=parts[1];
-                        this.central.agregarmap(parts[1],this);
+                if(parts[0].equalsIgnoreCase("REGISTER") && parts.length>=3){
+                    String id = parts[1];
+                    String ubicacion = parts[2];
+
+                    Estacion estacionMemoria = this.central.buscarEstacionMemoria(id);
+                    if (estacionMemoria == null) {
+                        Estacion nueva = new Estacion(id, ubicacion);
+                        this.central.actualizarEstacionEnSistema(nueva);
+                        respuesta = "OK/STATION_REGISTERED";
+                    } else {
+                        //Ya estaba en memoria (cargada de la BD o es una reconexión del Monitor).
+                        //parts[2] es la ubicación, no un estado, así que ya no se usa en setEstado.
+                        //Solo pasa a AVAILABLE si estaba DISCONNECTED: no se pisa OUT_OF_SERVICE ni LEAK
+                        if (estacionMemoria.getEstado().equalsIgnoreCase("DISCONNECTED")) {
+                            estacionMemoria.setEstado("AVAILABLE");
+                        }
+                        this.central.actualizarEstacionEnSistema(estacionMemoria);
+                        respuesta = "OK/STATUS_UPDATED";
                     }
-                    else{
-                        this.central.actualEstadoEstacion(parts[1],parts[2]);
-                        respuesta=" OK/ESTADO_ACTUALIZADO";
+
+                    //Esto se hace siempre (nueva o ya conocida): si no, el handler no queda en el mapa
+                    this.idEstacion = id;
+                    this.central.agregarmap(id, this);
+                }
+                else if (parts[0].equalsIgnoreCase("UPDATE_STATUS") && parts.length >= 3) {
+                    Estacion est = this.central.buscarEstacionMemoria(parts[1]);
+                    if (est != null) {
+                        est.setEstado(parts[2]);
+                        this.central.actualizarEstacionEnSistema(est);
+                        respuesta = "OK/STATUS_UPDATED";
+                    } else {
+                        respuesta = "STATUS/ERROR/Station not found";
                     }
                 }
-                else if(parts[0].equalsIgnoreCase("ACTUALIZAR_ESTADO") && parts.length>=3){
-                    boolean aux=this.central.actualEstadoEstacion(parts[1],parts[2]);
-                    if(aux){
-                        respuesta=" OK/ESTADO_ACTUALIZADO";
+                else if (parts[0].equalsIgnoreCase("LEAK")) {
+                    if (idEstacion == null) {
+                        respuesta = "STATUS/ERROR/Estacion no registrada";
+                    } else {
+                        System.out.println("No hay riego porque hay una avería en la estación " + idEstacion);
+                        //Cambia el estado a LEAK y avisa al operario que estaba regando
+                        this.central.notificarFuga(idEstacion, true);
+                        respuesta = "OK/LEAK_REGISTERED";
                     }
-                    else{
-                        respuesta = " STATUS/ERROR/Estacion no encontrada";
+                } else if (parts[0].equalsIgnoreCase("LEAK_RESOLVED")) {
+                    if (idEstacion == null) {
+                        respuesta = "STATUS/ERROR/Estacion no registrada";
+                    } else {
+                        System.out.println("Ya no hay una avería en la estación " + idEstacion);
+                        this.central.notificarFuga(idEstacion, false);
+                        respuesta = "OK/LEAK_RESOLVED_REGISTERED";
                     }
-                }
-                else if (parts[0].equalsIgnoreCase("FUGA")) {
-                    System.out.println("No hay riego porque hay una avería en la estación " + idEstacion);
-                    String mensajeKafka = " ALERTA_FUGA/" + idEstacion;
-                    enviarTrama(mensajeKafka,"central_fo");
-                    respuesta = "OK/FUGA_REGISTRADA";
-                } else if (parts[0].equalsIgnoreCase("FUGA_RESUELTA")) {
-                    System.out.println("Ya no hay una avería en la estación " + idEstacion);
-                    String mensajeKafka = " FUGA_RESUELTA/" + idEstacion;
-                    enviarTrama(mensajeKafka,"central_fo");
-                    respuesta = "OK/FUGA_RESUELTA_REGISTRADA";
                 }
                 else{
-                    respuesta = " STATUS/ERROR/Operacion no valida";
+                    respuesta = "STATUS/ERROR/Operacion no valida";
                 }
             }
             else {
-                respuesta = " STATUS/ERROR/Operacion no valida";
+                respuesta = "STATUS/ERROR/Operacion no valida";
             }
         }
         else{
-            respuesta = " STATUS/ERROR/Operacion no valida";
+            respuesta = "STATUS/ERROR/Operacion no valida";
         }
         return respuesta;
     }
@@ -105,35 +119,46 @@ public class ClientHandler implements Runnable{
         String resultado;
         String Cadena;
         try{
-           while((Cadena=leerSocket())!=null){
-               System.out.println("Trama recibida" + Cadena);
-               resultado=this.processtrama(Cadena);
-               System.out.println("El resultado de la trama recibida"+resultado);
-               this.escribirSocket(resultado);
-           }
+            while((Cadena=leerSocket())!=null){
+                System.out.println("Trama recibida" + Cadena);
+                resultado=this.processtrama(Cadena);
+                System.out.println("El resultado de la trama recibida"+resultado);
+                this.escribirSocket(resultado);
+            }
         }catch(Exception e){
             System.err.println("Error al realizar el run");
         }
         finally {
-            if( this. socketCliente!=null && !this. socketCliente.isClosed()){
+            if (this.socketCliente != null && !this.socketCliente.isClosed()) {
                 try {
                     this.socketCliente.close();
-                    System.out.println("Socket cerrado correctamente");
-                    this.central.eliminarmap(this.idEstacion);
-                    this.central.actualEstadoEstacion(this.idEstacion, "DISCONNECTED");
+                    System.out.println("Socket cerrado correctamente.");
                 } catch (IOException e) {
-                    System.out.println("Socket no cerrado correctamente");
+                    System.err.println("Error al cerrar el socket: " + e.getMessage());
                 }
+            }
+            //Esto es por si la estacion llego realmente a conectarese
+            if (this.idEstacion != null && !this.idEstacion.trim().isEmpty()) {
+                System.out.println("Procesando desconexión de la estación: " + this.idEstacion);
+                //Solo se procesa la desconexión si este handler sigue siendo el activo en el mapa.
+                //Si el Monitor ya reconectó con otro handler, este no debe borrar al nuevo ni marcarla DISCONNECTED
+                if (this.central.eliminarmap(this.idEstacion, this)) {
+                    this.central.procesarDesconexionEstacion(this.idEstacion);
+                }
+            } else {
+                System.out.println("Cliente desconectado sin haberse registrado previamente.");
             }
         }
     }
     //Para enviar una trama necesito el productor el mensaje que ya esta aqui y el topico
+    //(Se publica en Kafka; el socket solo se comprueba para saber si la estación sigue conectada)
     public void enviarTrama(String s,String topic) {
         if(salida !=null && this.socketCliente != null && !this.socketCliente.isClosed()){
-          central.enviarmensajekafka(s,topic);
+            central.enviarmensajekafka(s,topic);
         }
         else{
             System.err.println("No se pudo enviar la trama, socket no disponible");
         }
     }
 }
+
