@@ -261,14 +261,14 @@ public class WM_E {
                     String[] info = registro.value().split("/");
                     String operacion = info[0];
 
-                    int posicion = operacion.equals("WATERING_REQUEST") ? 2 : 1; // Dependiendo de la operacion, el idWS se encontrará en una posición u otra
+                    int posicion = operacion.equals("WATERING_REQUEST_ANSWER") ? 2 : 1; // Dependiendo de la operacion, el idWS se encontrará en una posición u otra
                     if (info.length <= posicion || !info[posicion].equalsIgnoreCase(idWS)) continue; // Si el mensaje no es para esta WS, se descarta
 
                     System.out.println("Orden recibida desde Central: " + registro.value());
 
                     // Si la trama de petición de riego es correcta:
-                    if (operacion.equals("WATERING_REQUEST") && info.length >= 4) {
-                        iniciarRiego(info[3]); // WATERING_REQUEST/operario/estacion/segundos
+                    if (operacion.equals("WATERING_REQUEST_ANSWER") && info.length >= 4) {
+                        iniciarRiego(info[3]); // WATERING_REQUEST_ANSWER/operario/estacion/segundos
 
                     // Si Central bloquea la WS:
                     } else if (operacion.equals("BLOQUEAR")) {
