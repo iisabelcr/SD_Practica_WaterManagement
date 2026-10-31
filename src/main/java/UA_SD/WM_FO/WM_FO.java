@@ -148,7 +148,7 @@ public class WM_FO {
      * @param scanner
      */
     private static void pausar(Scanner scanner) {
-        System.out.println("\nPulsa Enter para volver al menú...");
+        System.out.print("\nPulsa Enter para volver al menú... ");
         scanner.nextLine();
     }
 
@@ -403,7 +403,7 @@ public class WM_FO {
         // Se pide la estación hasta que sea una de la lista (o se cancela):
         String estacion = null;
         while (estacion == null) {
-            System.out.print("Introduce el ID de la estación deseada (escribe 'q' para cancelar): ");
+            System.out.println("\nIntroduce el ID de la estación deseada (escribe 'q' para cancelar): ");
             String entrada = scanner.nextLine().trim();
 
             if (entrada.equalsIgnoreCase("q")) {
@@ -485,6 +485,7 @@ public class WM_FO {
      */
     private static void imprimirEstaciones(List<String[]> estaciones) {
         System.out.printf("%-10s | %s%n", "ID", "UBICACIÓN");
+        System.out.print("--------------------------");
         for (String[] est : estaciones) {
             System.out.printf("%-10s | %s%n", est[0], est[1]);
         }
