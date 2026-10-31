@@ -17,10 +17,10 @@ public class WM_M {
     private static volatile boolean centralConectada = false;
 
     //Tramas para la comuncicación a través de los sockets:
-    private static String tramaRegistro()     { return "REGISTER/" + idWS + "/" + ubicacion; }
-    private static String tramaAveria()       { return "LEAK/" + idWS; }
+    private static String tramaRegistro() { return "REGISTER/" + idWS + "/" + ubicacion; }
+    private static String tramaAveria() { return "LEAK/" + idWS; }
     private static String tramaRecuperacion() { return "LEAK_RESOLVED/" + idWS; }
-    private static String tramaEstado()       { return "STATUS/" + idWS; }
+    private static String tramaEstado() { return "STATUS/" + idWS; }
 
     /**
      * Clase interna que permite la comunicación entre el Monitor y el Engine de la WS de forma asíncrona

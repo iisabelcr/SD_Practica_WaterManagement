@@ -50,6 +50,7 @@ public class WM_E {
                     System.out.println("2. Finalizar el riego en curso");
                     System.out.println("3. " + (averia ? "Reparar la avería" : "Provocar una avería"));
                     System.out.println("4. Ver estado");
+                    System.out.println("5. Salir");
 
                     switch (scanner.nextLine().trim()) {
                         case "1":
@@ -94,6 +95,16 @@ public class WM_E {
                         case "4":
                             System.out.println("Avería: " + averia + " | Fuera de servicio: " + bloqueada + " | Regando: " + (riegoActual != null) + " | Monitor conectado: " + monitorConectado);
                             break;
+                        
+                        case "5":
+                            System.out.println("Cerrando estación...");
+                            scanner.close();
+
+                            if (productor != null) {
+                                productor.close(); 
+                            }
+                            
+                            System.exit(0);
 
                         default:
                             System.out.println("Opción no válida");
