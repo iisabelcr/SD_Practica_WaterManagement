@@ -50,7 +50,7 @@ services:
     depends_on: [ws1-monitor]
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_E
-      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} ws1-monitor 9101"
+      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} ws1-monitor 9101 WS-01"
 
   # ================= ESTACIÓN WS-02 =====================
   ws2-monitor:
@@ -65,7 +65,7 @@ services:
     depends_on: [ws2-monitor]
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_E
-      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} ws2-monitor 9102"
+      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} ws2-monitor 9102 WS-02"
 
   # ===================== OPERARIOS ======================
   fo1:
