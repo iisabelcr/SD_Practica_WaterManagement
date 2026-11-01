@@ -489,7 +489,7 @@ public class WM_FO {
      */
     private static void imprimirEstaciones(List<String[]> estaciones) {
         System.out.printf("%-10s | %s%n", "ID", "UBICACIÓN");
-        System.out.println("--------------------------\n");
+        System.out.println("--------------------------");
         for (String[] est : estaciones) {
             System.out.printf("%-10s | %s%n", est[0], est[1]);
         }

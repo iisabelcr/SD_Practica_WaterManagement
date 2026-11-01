@@ -44,6 +44,7 @@ services:
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_M
       APP_ARGS: "9101 ${CENTRAL_HOST} ${CENTRAL_PORT} WS-01 RiverPark"
+    profiles: ["estaciones"]
 
   ws1-engine:
     <<: *app
@@ -51,6 +52,9 @@ services:
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_E
       APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} ws1-monitor 9101 WS-01"
+    profiles: ["estaciones"]
+    stdin_open: true
+    tty: true
 
   # ================= ESTACIÓN WS-02 =====================
   ws2-monitor:
@@ -59,6 +63,7 @@ services:
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_M
       APP_ARGS: "9102 ${CENTRAL_HOST} ${CENTRAL_PORT} WS-02 CentralPark"
+    profiles: ["estaciones"]
 
   ws2-engine:
     <<: *app
@@ -66,21 +71,30 @@ services:
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_E
       APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} ws2-monitor 9102 WS-02"
-
+    profiles: ["estaciones"]
+    stdin_open: true
+    tty: true
+    
   # ===================== OPERARIOS ======================
   fo1:
     <<: *app
-    volumes: ["./servicios_fo1.txt:/app/servicios.txt:ro"]
+    volumes: ["./src/main/java/UA_SD/WM_FO/servicios:/app/servicios:ro"]
     environment:
       MAIN_CLASS: UA_SD.WM_FO.WM_FO
-      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} FO-01 /app/servicios.txt"
+      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} FO-01 /app/servicios/servicios_fo1.txt"
+    profiles: ["operarios"]
+    stdin_open: true
+    tty: true
 
   fo2:
     <<: *app
-    volumes: ["./servicios_fo2.txt:/app/servicios.txt:ro"]
+    volumes: ["./src/main/java/UA_SD/WM_FO/servicios:/app/servicios:ro"]
     environment:
       MAIN_CLASS: UA_SD.WM_FO.WM_FO
-      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} FO-02 /app/servicios.txt"
+      APP_ARGS: "${KAFKA_HOST} ${KAFKA_PORT} FO-02 /app/servicios/servicios_fo2.txt"
+    profiles: ["operarios"]
+    stdin_open: true
+    tty: true
 
 volumes:
   central-data:
