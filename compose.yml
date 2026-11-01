@@ -5,6 +5,7 @@ x-app: &app
   restart: on-failure
   stdin_open: true
   tty: true
+  build: .
 
 services:
   # ============ SOLO LOCAL (profile "local") ============
@@ -39,7 +40,6 @@ services:
   # ================= ESTACIÓN WS-01 =====================
   ws1-monitor:
     <<: *app
-    build: .
     container_name: WS_M1
     environment:
       MAIN_CLASS: UA_SD.WM_WS.WM_M

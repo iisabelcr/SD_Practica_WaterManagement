@@ -107,8 +107,8 @@ public class WM_FO {
                         System.out.println("Riego autorizado en " + info[1]);
                     } else {
                         System.out.println("Riego denegado en " + info[1] + (info.length > 3 ? ": " + info[3] : ""));
-                        eventos.add(info);
                     }
+                    eventos.add(info);
                     break;
                 
                 // Los datos que va enviando, a tiempo real, la Central sobre la WS:
@@ -119,7 +119,9 @@ public class WM_FO {
                     break;
 
                 // Indica que el riego de una estación ha llegado a su fin:
-                case "WATERING_END": System.out.println("Riego finalizado en " + info[1]); eventos.add(info); break;
+                case "WATERING_END": System.out.println("Riego finalizado en " + info[1] + (info.length >= 4 ? " -> duración: " + info[2] + " s | volumen total: " + info[3] + " L" : ""));
+                eventos.add(info);
+                break;
 
                 // Alerta de fuga:
                 case "LEAK_ALERT": System.out.println("¡FUGA en " + info[1] + "! Riego interrumpido."); eventos.add(info); break;
@@ -255,7 +257,8 @@ public class WM_FO {
         // Se establecen las propiedades:
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, idOperador + "-" + java.util.UUID.randomUUID());
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "fo-" + idOperador);
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 10000); // Para que un reinicio rápido no espere al timeout por defecto
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest"); // Para que solo lea los mensajes nuevos
@@ -328,14 +331,19 @@ public class WM_FO {
 
         System.out.println("Solicitud enviada. Esperando a Central...");
 
-        // Espera al evento lo que dure el riego más un margen de 20 segundos:
+        // Respuesta de Central;
+        String[] respuesta = esperarEvento(hilo, "WATERING_RESPONSE", idEstacion, 10);
+        if (respuesta == null) {
+            System.out.println("Imposible conectar con Central: no ha respondido a la solicitud");
+            return;
+        }
+
+        if (!respuesta[2].equals("OK")) return; // El motivo ya se ha mostrado
+
+        // Fin del riego (o fuga):
         String[] evento = esperarEvento(hilo, null, idEstacion, segundos + 20);
-
         if (evento == null) {
-            System.out.println("Central no ha respondido a tiempo");
-
-        } else if (evento[0].equals("WATERING_END")) {
-            System.out.println("\nResumen -> duración: " + evento[2] + " s | volumen total: " + evento[3] + " L");
+            System.out.println("Imposible conectar con Central: servicio caído");
         }
     }
 
@@ -561,7 +569,7 @@ public class WM_FO {
         // Si no se ha podido conectar con el broker, se saldrá del programa
         boolean conectado = false;
         try {
-            conectado = hilo.getListo().await(15, TimeUnit.SECONDS);
+            conectado = hilo.getListo().await(30, TimeUnit.SECONDS);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
