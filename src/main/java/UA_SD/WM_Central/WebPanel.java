@@ -55,13 +55,8 @@ public class WebPanel {
     }
 
     public static int puertoPorDefecto() {
-        String p = System.getenv("WEB_PORT");
-        if (p == null) p = System.getenv("PORT");
-        try {
-            return p == null ? 8080 : Integer.parseInt(p.trim());
-        } catch (NumberFormatException e) {
             return 8080;
-        }
+        
     }
 
     public void iniciar() {

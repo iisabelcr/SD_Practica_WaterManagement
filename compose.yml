@@ -28,7 +28,7 @@ services:
     <<: *app
     profiles: [local]
     container_name: Central
-    ports: ["5000:5000"]
+    ports: ["5000:5000","8080:8080"]
     volumes: ["central-data:/data"]
     environment:
       CENTRAL_PORT: 5000
