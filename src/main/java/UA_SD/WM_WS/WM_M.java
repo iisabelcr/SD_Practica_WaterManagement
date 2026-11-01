@@ -8,20 +8,20 @@ public class WM_M {
     private static String ubicacion;
     private static String ipCentral;
     private static int puertoCentral;
-    private static volatile boolean averia = false;
+    private static volatile boolean averia = true; // Se inicializa a true hasta que se conecte el engine
 
     // Variables para la conexión con Central:
     private static Socket socketCentral;
     private static BufferedReader entradaCentral;
     private static PrintWriter salidaCentral;
     private static volatile boolean centralConectada = false;
+    private static volatile boolean engineConectado = false;
 
     //Tramas para la comuncicación a través de los sockets:
     private static String tramaRegistro() { return "REGISTER/" + idWS + "/" + ubicacion; }
     private static String tramaAveria() { return "LEAK/" + idWS; }
     private static String tramaRecuperacion() { return "LEAK_RESOLVED/" + idWS; }
     private static String tramaEstado() { return "STATUS/" + idWS; }
-
     /**
      * Clase interna que permite la comunicación entre el Monitor y el Engine de la WS de forma asíncrona
      * HiloServidorEngine
@@ -40,6 +40,9 @@ public class WM_M {
 
                 while (true) {
                     Socket socketEngine = servidor.accept(); // El Monitor espera indefinidamente hasta que se conecte el Engine
+                    engineConectado = true;
+                    mostrarEstado();
+
                     System.out.println("Conexión establecida con el Engine");
                     
                     comprobarSalud(socketEngine); // Iniciamos la comprobación periódica del estado de salud
@@ -47,6 +50,8 @@ public class WM_M {
                     // Se cierra el socket (y se procesa la excepción, en caso de que la haya)
                     try {
                         socketEngine.close();
+                        engineConectado = false;
+                        mostrarEstado();
                     } catch (IOException e) { }
 
                     System.out.println("Engine desconectado. Restableciendo conexión...");
@@ -74,6 +79,8 @@ public class WM_M {
                 notificarCentral(tramaRecuperacion());
                 System.out.println("La WS se ha recuperado de la avería");
             }
+
+            mostrarEstado();
         }
 
         private void comprobarSalud(Socket socketEngine) {
@@ -151,6 +158,7 @@ public class WM_M {
 
                     escucharCentral(); // Mientras Central siga conectada, el hilo se quedará parado en esta función
                     desconectarCentral();
+                    mostrarEstado();
                     System.out.println("Se ha perdido la conexión con Central");
                 }
 
@@ -172,8 +180,9 @@ public class WM_M {
      * @return booleano que indica el éxito de la conexión
      */
     private static boolean conectarCentral() {
+        Socket socket = null;
         try {
-            Socket socket = new Socket();
+            socket = new Socket();
             socket.connect(new InetSocketAddress(ipCentral, puertoCentral), 5000);
 
             // Se crean los canales y se guardan. De esta forma es más fácil enviar y leer mensajes
@@ -186,9 +195,14 @@ public class WM_M {
             String respuesta = in.readLine();
             socket.setSoTimeout(0); // Después, espera sin límite
 
-            if (respuesta == null || !respuesta.trim().startsWith("OK")) {
-                System.err.println("Central no ha aceptado el registro de la WS: " + respuesta);
-                System.exit(1); // Sin registrarse, se aborta el programa
+            if (respuesta == null) {
+                throw new IOException("Central cerró la conexión durante el registro");
+            }
+
+            if (!respuesta.trim().startsWith("OK")) {
+                System.err.println("Central ha denegado el registro de la WS: " + respuesta);
+                socket.close();
+                System.exit(1); // Se aborta la estación
             }
 
             synchronized (WM_M.class) {
@@ -199,12 +213,17 @@ public class WM_M {
             }
 
             System.out.println("WS registrada en Central (" + respuesta.trim() + ")");
-            
+            mostrarEstado();
+
             return true;
 
         } catch (Exception e) {
             System.out.println("No se ha podido conectar con Central");
             System.out.println("Error: " + e.getMessage());
+
+            try {
+                if (socket != null) socket.close();
+            } catch (IOException ex) {}
 
             return false;
         }
@@ -264,6 +283,21 @@ public class WM_M {
 
 
     /**
+     * Función que muestra el estado de la WS en el monitor
+     */
+    private static synchronized void mostrarEstado() {
+        String estado = averia ? "\u001B[31mAVERIADA\u001B[0m" : "\u001B[32mDISPONIBLE\u001B[0m"; // Pinta de colores dependiendo de si está averiada o no
+        System.out.println("-----------------------------------------");
+        System.out.println(" WS " + idWS + " (" + ubicacion + ")");
+        System.out.println(" Central: " + (centralConectada ? "CONECTADA" : "SIN CONEXIÓN (imposible conectar con WM_Central)"));
+        System.out.println(" Engine : " + (engineConectado ? "CONECTADO" : "NO CONECTADO"));
+        System.out.println(" Estado : " + estado);
+        System.out.println("-----------------------------------------");
+    }
+
+
+
+    /**
      * Función que limpia la pantalla de la consola
      */
     private static void clear() {
@@ -303,7 +337,7 @@ public class WM_M {
             return "TIMEOUT";
 
 		} catch (Exception e) {
-			System.out.println("Ha fallado la conexión con Central");
+			System.out.println("Ha fallado la conexión con el Engine");
             System.out.println("Error: " + e.getMessage());
             return null;
 		}
