@@ -331,7 +331,7 @@ public class WM_FO {
             System.out.println("Central no ha respondido a tiempo");
 
         } else if (evento[0].equals("WATERING_END")) {
-            System.out.println("Resumen -> duración: " + evento[2] + " s | volumen total: " + evento[3] + " L");
+            System.out.println("\nResumen -> duración: " + evento[2] + " s | volumen total: " + evento[3] + " L");
         }
     }
 
@@ -403,7 +403,7 @@ public class WM_FO {
         // Se pide la estación hasta que sea una de la lista (o se cancela):
         String estacion = null;
         while (estacion == null) {
-            System.out.println("\nIntroduce el ID de la estación deseada (escribe 'q' para cancelar): ");
+            System.out.print("\nIntroduce el ID de la estación deseada (escribe 'q' para cancelar): ");
             String entrada = scanner.nextLine().trim();
 
             if (entrada.equalsIgnoreCase("q")) {
@@ -485,7 +485,7 @@ public class WM_FO {
      */
     private static void imprimirEstaciones(List<String[]> estaciones) {
         System.out.printf("%-10s | %s%n", "ID", "UBICACIÓN");
-        System.out.print("--------------------------");
+        System.out.println("--------------------------");
         for (String[] est : estaciones) {
             System.out.printf("%-10s | %s%n", est[0], est[1]);
         }

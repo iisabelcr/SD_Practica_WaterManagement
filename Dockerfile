@@ -4,5 +4,7 @@ COPY pom.xml .
 RUN mvn -q dependency:go-offline
 COPY src ./src
 RUN mvn -q clean compile
+EXPOSE 8080
+
 ENV MAIN_CLASS=UA_SD.WM_Central.WM_Central
 CMD sh -c 'mvn -q exec:java -Dexec.mainClass="$MAIN_CLASS" -Dexec.args="${APP_ARGS:-$CENTRAL_PORT $KAFKA_HOST $KAFKA_PORT}"'
