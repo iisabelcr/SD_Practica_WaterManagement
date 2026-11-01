@@ -32,6 +32,7 @@ public class WM_E {
     static volatile boolean bloqueada = false; // Fuera de servicio por orden de Central
     static volatile HiloRiego riegoActual = null; // Indica si hay un riego en curso o no (null si no lo hay)
     static volatile boolean monitorConectado = false; // Determina que el monitor sigue conectado al engine
+    static volatile boolean centralConectada = true;
     static String idWS;
     static KafkaProducer<String, String> productor;
     static final BlockingQueue<String> eventos = new LinkedBlockingQueue<>(); // Cola de eventos (para que no se superpongan los mensajes)
@@ -57,6 +58,7 @@ public class WM_E {
             while (true) {
                 try (Socket socketMonitor = new Socket(ipMonitor, puerto)) {
                     System.out.println("Engine conectado con el Monitor");
+                    socketMonitor.setSoTimeout(5000);
                     monitorConectado = true;
 
                     while (true) {
@@ -72,6 +74,12 @@ public class WM_E {
                             }
 
                             break;
+                        }
+
+                        boolean centralAhora = !respuesta.endsWith("CENTRAL_KO");
+                        if (centralAhora != centralConectada) {
+                            centralConectada = centralAhora;
+                            System.out.println(centralAhora ? "Conexión con WM_Central restablecida" : "Imposible conectar con WM_Central");
                         }
 
                         escribirSocket(socketMonitor, averia ? "KO" : "OK");
@@ -191,7 +199,7 @@ public class WM_E {
                 System.out.println("Central no ha respondido a tiempo");
 
             } else if (resultado.equals("INICIADO")) {
-                while (!"FIN".equals(eventos.take())) {} // Se espera hasta que reciba el evento de fin de riego en la cola
+                System.out.println("Riego en marcha. Usa la opción 2 para finalizarlo o la 3 para simular un KO.");
             }
 
         } catch (InterruptedException e) {
@@ -325,6 +333,11 @@ public class WM_E {
                     } else if (operacion.equals("ACTIVAR")) {
                         bloqueada = false;
                         System.out.println("Estación activada por orden de Central");
+                    
+                    // Si central no acepta la petición de riego manual
+                    } else if (operacion.equals("MANUAL_DENIED")) {
+                        System.out.println("Central ha denegado el riego manual: " + (info.length >= 3 ? info[2] : "motivo desconocido"));
+                        eventos.add("RECHAZADO");
                     }
                 }
             }
@@ -348,10 +361,12 @@ public class WM_E {
      * @return opción escogida
      */
     private static int mostrarMenu(Scanner scanner) {
-        System.out.println("+-------------------------------------+");
-        System.out.println("|       WATERING STATION: " + idWS + "       |");
-        System.out.println("+-------------------------------------+\n");
+        System.out.println("+--------------------------------------+");
+        System.out.println("|       WATERING STATION: ENGINE       |");
+        System.out.println("+--------------------------------------+\n");
 
+        System.out.println("ID: " + idWS);
+        System.out.println("----------------------------------------\n");
         System.out.println("1. Solicitar riego manual");
         System.out.println("2. Finalizar el riego en curso");
         System.out.println("3. " + (averia ? "Reparar la avería" : "Provocar una avería"));
@@ -545,6 +560,8 @@ public class WM_E {
                     case 1:
                         if (!monitorConectado) {
                             System.out.println("No se puede iniciar un riego manual: el Monitor no está conectado al Engine");
+                        } else if (!centralConectada) {
+                            System.out.println("Imposible conectar con WM_Central");
                         } else {
                             solicitarRiegoManual(scanner);
                         }
@@ -572,7 +589,7 @@ public class WM_E {
                         break;
 
                     case 4:
-                        System.out.println("Avería: " + averia + " | Fuera de servicio: " + bloqueada + " | Regando: " + (riegoActual != null) + " | Monitor conectado: " + monitorConectado);
+                        System.out.println("Avería: " + averia + " | Fuera de servicio: " + bloqueada + " | Regando: " + (riegoActual != null) + " | Monitor conectado: " + monitorConectado + " | Central conectada: " + centralConectada);
                         pausar(scanner);
                         break;
 

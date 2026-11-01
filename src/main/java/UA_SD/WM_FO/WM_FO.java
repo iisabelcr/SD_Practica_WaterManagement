@@ -29,6 +29,7 @@ import java.util.List;
 public class WM_FO {
     private static final String TOPIC_PRODUCTOR = "fo_central";
     private static final String TOPIC_CONSUMIDOR = "central_fo";
+    private static String idOperador;
 
     /**
      * Clase interna que permite escuchar los mensajes de Central en un hilo distinto
@@ -184,6 +185,9 @@ public class WM_FO {
         System.out.println("+-----------------------------+");
         System.out.println("|       FIELD OPERATORS       |");
         System.out.println("+-----------------------------+\n");
+
+        System.out.println("ID: " + idOperador);
+        System.out.println("-------------------------------\n");
 
         System.out.println("1. Procesar fichero de solicitudes de riego");
         System.out.println("2. Solicitar suministro");
@@ -485,7 +489,7 @@ public class WM_FO {
      */
     private static void imprimirEstaciones(List<String[]> estaciones) {
         System.out.printf("%-10s | %s%n", "ID", "UBICACIÓN");
-        System.out.println("--------------------------");
+        System.out.println("--------------------------\n");
         for (String[] est : estaciones) {
             System.out.printf("%-10s | %s%n", est[0], est[1]);
         }
@@ -534,7 +538,7 @@ public class WM_FO {
         // Guardamos la información:
         String ipBroker = args[0];
         String puertoBroker = args[1];
-        String idOperador = args[2];
+        idOperador = args[2];
 
         // Si se ha introducido un fichero de solicitud de servicios:
         String servicios = null;

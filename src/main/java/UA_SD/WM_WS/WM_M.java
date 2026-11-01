@@ -21,7 +21,7 @@ public class WM_M {
     private static String tramaRegistro() { return "REGISTER/" + idWS + "/" + ubicacion; }
     private static String tramaAveria() { return "LEAK/" + idWS; }
     private static String tramaRecuperacion() { return "LEAK_RESOLVED/" + idWS; }
-    private static String tramaEstado() { return "STATUS/" + idWS; }
+    private static String tramaEstado() { return "STATUS/" + idWS + "/" + (centralConectada ? "CENTRAL_OK" : "CENTRAL_KO"); }
     /**
      * Clase interna que permite la comunicación entre el Monitor y el Engine de la WS de forma asíncrona
      * HiloServidorEngine
@@ -379,7 +379,9 @@ public class WM_M {
         idWS = args[3];
         ubicacion = args[4];
 
+        clear();
         iniciarMonitor();
+        clear();
 
         // Conexión con Central:
         HiloCentral hiloCentral = new HiloCentral();
